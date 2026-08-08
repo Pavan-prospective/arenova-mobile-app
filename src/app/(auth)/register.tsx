@@ -1,0 +1,551 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Typography, Button, TextInput } from '@/components/ui';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useAuthStore } from '@/store';
+import { api } from '@/services/api';
+import { auth } from '@/services/firebase';
+import { 
+  createUserWithEmailAndPassword, 
+  sendEmailVerification, 
+  getIdToken, 
+  PhoneAuthProvider,
+  linkWithCredential
+} from 'firebase/auth';
+
+const coachBenefits = [
+  { title: 'Earn Money Coaching', desc: 'Get High-Quality Leads & Clients' },
+  { title: 'Flexible Schedule', desc: 'Set Your Own Hours' },
+  { title: 'Zero Commission', desc: 'Earn 100% In The First Month' },
+  { title: 'Track Earnings', desc: 'Dashboard To View Your Income' },
+  { title: 'Be Part Of A Community', desc: 'Join Sports Events & Programs' }
+];
+
+const validatePassword = (pass: string): string | null => {
+  if (pass.length < 8) {
+    return 'Password must be at least 8 characters long';
+  }
+  if (!/[A-Z]/.test(pass)) {
+    return 'Password must contain at least one uppercase letter';
+  }
+  if (!/[a-z]/.test(pass)) {
+    return 'Password must contain at least one lowercase letter';
+  }
+  if (!/[0-9]/.test(pass)) {
+    return 'Password must contain at least one number';
+  }
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(pass)) {
+    return 'Password must contain at least one special character';
+  }
+  return null;
+};
+
+export default function RegisterScreen() {
+  const { role } = useLocalSearchParams<{ role: string }>();
+  
+  const setToken = useAuthStore(state => state.setToken);
+  const setUser = useAuthStore(state => state.setUser);
+  
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [registrationPhase, setRegistrationPhase] = useState<'input' | 'email-verify' | 'phone-verify'>('input');
+  
+  const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
+  const recaptchaVerifier = useRef<any>(null);
+  const [verificationId, setVerificationId] = useState('');
+  const [otp, setOtp] = useState('');
+
+  // Fetch sports dynamically from backend
+  const { data: sportsResponse } = useQuery({
+    queryKey: ['activeSports'],
+    queryFn: async () => {
+      const res = await api.get('/sports');
+      return res.data;
+    }
+  });
+
+  const backendSports = sportsResponse?.data || [];
+  const fallbackSports = ['Football', 'Basketball', 'Tennis', 'Cricket', 'Swimming', 'Gym', 'Athletics', 'Yoga', 'Martial Arts', 'Badminton', 'Fitness', 'Squash', 'Table Tennis'];
+  const sportsList = backendSports.length > 0 ? backendSports.map((s: any) => s.name || s.title || s) : fallbackSports;
+
+  const toggleSport = (sport: string) => {
+    setSelectedSports(prev => 
+      prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
+    );
+  };
+
+  const step1Mutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name,
+        email,
+        phone,
+        phoneNumber: phone,
+        sports: selectedSports,
+      };
+      const response = await api.post('/auth/coach/register-step1', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      startEmailVerification();
+    },
+    onError: (error: any) => {
+      Alert.alert('Registration Error', error?.response?.data?.message || 'Pre-registration check failed');
+    }
+  });
+
+  const startEmailVerification = async () => {
+    setRegistrationPhase('email-verify');
+    setIsFirebaseLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(userCredential.user);
+      setIsFirebaseLoading(false);
+      Alert.alert("Email Sent", "Please check your inbox and click the verification link.");
+    } catch (err: any) {
+      setIsFirebaseLoading(false);
+      Alert.alert('Email Auth Error', err.message);
+    }
+  };
+
+  useEffect(() => {
+    let interval: any;
+    if (registrationPhase === 'email-verify') {
+      interval = setInterval(async () => {
+        if (auth.currentUser) {
+          await auth.currentUser.reload();
+          if (auth.currentUser.emailVerified) {
+            clearInterval(interval);
+            try {
+              const idToken = await getIdToken(auth.currentUser, true);
+              verifyFirebaseMutation.mutate(idToken);
+            } catch (err: any) {
+              Alert.alert('Auth Error', err.message);
+            }
+          }
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [registrationPhase]);
+
+  const sendPhoneOtp = async () => {
+    if (!phone) {
+      Alert.alert('Error', 'Phone number is required.');
+      return;
+    }
+    try {
+      setIsFirebaseLoading(true);
+      const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+      const provider = new PhoneAuthProvider(auth);
+      const vId = await provider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
+      setVerificationId(vId);
+      setIsFirebaseLoading(false);
+      Alert.alert('OTP Sent', 'Check your messages for the verification code.');
+    } catch (err: any) {
+      setIsFirebaseLoading(false);
+      Alert.alert('SMS Error', err.message);
+    }
+  };
+
+  const verifyPhoneAndLink = async () => {
+    if (!otp) return;
+    try {
+      setIsFirebaseLoading(true);
+      const credential = PhoneAuthProvider.credential(verificationId, otp);
+      if (auth.currentUser) {
+        await linkWithCredential(auth.currentUser, credential);
+        const idToken = await getIdToken(auth.currentUser, true);
+        verifyFirebaseMutation.mutate(idToken);
+      } else {
+        throw new Error("No user is currently signed in to link credentials.");
+      }
+    } catch (err: any) {
+      setIsFirebaseLoading(false);
+      Alert.alert('Linking Error', err.message);
+    }
+  };
+
+  const directRegisterMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        firstName: name,
+        email,
+        phone,
+        password,
+        role: role === 'individual' ? 'player' : 'parent'
+      };
+      const response = await api.post('/auth/register', payload);
+      return response.data;
+    },
+    onSuccess: async (data) => {
+      try {
+        const loginResponse = await api.post('/auth/login', {
+          email,
+          password
+        });
+        const loginData = loginResponse.data;
+        const realToken = loginData.token || loginData.jwt || loginData.access_token || (loginData.data && loginData.data.token);
+        setToken(realToken);
+        const userObj = loginData.user || loginData.data?.user;
+        setUser({
+          id: userObj?._id || loginData.data?.user?._id || '1',
+          name: name || '',
+          phone: phone || '',
+          email: email || '',
+          role: (role as any) || 'individual',
+          status: 'active',
+          isRegistered: true,
+        });
+        Alert.alert('Registration Successful', 'Welcome to Arenova!');
+      } catch (loginError) {
+        Alert.alert(
+          'Registered Successfully', 
+          'Your account is created. Please log in with your email and password.',
+          [{ text: 'OK', onPress: () => router.replace({ pathname: '/(auth)/login', params: { role } }) }]
+        );
+      }
+    },
+    onError: (error: any) => {
+      Alert.alert('Registration Error', error?.response?.data?.message || 'Failed to register account');
+    }
+  });
+
+  const verifyFirebaseMutation = useMutation({
+    mutationFn: async (idToken: string) => {
+      const response = await api.post('/auth/coach/verify-firebase', {
+        firebaseIdToken: idToken,
+        name,
+        phone,
+        phoneNumber: phone,
+        email,
+        sports: selectedSports
+      });
+      return response.data;
+    },
+    onSuccess: async (data) => {
+      const realToken = data.token || data.jwt || data.access_token || (data.data && data.data.token);
+      setToken(realToken);
+      const userObj = data.user || data.data?.user;
+      const userPhone = userObj?.phone || userObj?.phoneNumber || phone || '';
+      setUser({
+        id: userObj?._id || data.data?.user?._id || '1',
+        name: name || '',
+        phone: userPhone,
+        email: email || '',
+        role: (role as any) || 'coach',
+        status: 'pending',
+        isRegistered: true,
+      });
+      router.push({ pathname: '/(coach)/onboarding', params: { role } });
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', error?.response?.data?.message || 'Final verification failed');
+    }
+  });
+
+  const validateEmail = (text: string) => {
+    const reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w\w+)+$/;
+    return reg.test(text.trim());
+  };
+
+  const validateField = (field: string, val: string) => {
+    let err = '';
+    if (field === 'name') {
+      if (!val.trim()) err = 'Full name is required';
+    } else if (field === 'email') {
+      if (!val.trim()) {
+        err = 'Email is required';
+      } else if (!validateEmail(val)) {
+        err = 'Please enter a valid email address';
+      }
+    } else if (field === 'phone') {
+      if (!val.trim()) {
+        err = 'Phone number is required';
+      } else if (val.trim().length < 10) {
+        err = 'Please enter a valid 10-digit phone number';
+      }
+    } else if (field === 'password') {
+      const passError = validatePassword(val);
+      if (passError) err = passError;
+    }
+    
+    setErrors(prev => {
+      const next = { ...prev };
+      if (err) {
+        next[field] = err;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
+  const handleInitialSubmit = () => {
+    const newErrors: Record<string, string> = {};
+    if (!name.trim()) newErrors.name = 'Full name is required';
+    
+    if (!email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!validateEmail(email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    if (!phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (phone.trim().length < 10) {
+      newErrors.phone = 'Please enter a valid 10-digit phone number';
+    }
+    
+    const passError = validatePassword(password);
+    if (passError) {
+      newErrors.password = passError;
+    }
+    
+    if (role === 'coach' && selectedSports.length === 0) {
+      newErrors.sports = 'Please select at least one sport';
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+
+    if (role === 'coach') {
+      step1Mutation.mutate();
+    } else {
+      directRegisterMutation.mutate();
+    }
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+
+        <View className="px-6 py-4 z-10">
+          <TouchableOpacity onPress={() => {
+            if (registrationPhase !== 'input') {
+              setRegistrationPhase('input'); 
+            } else if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/(auth)/role-selection');
+            }
+          }} className="p-2 -ml-2 w-12">
+            <Ionicons name="arrow-back" size={28} color="#0F2C59" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+          
+          {role === 'coach' && registrationPhase === 'input' ? (
+            <View className="mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+              {coachBenefits.map((benefit, i) => (
+                <View key={benefit.title}>
+                  <View className="flex-row items-start py-1">
+                    <View className="mr-3 mt-0.5">
+                      <Ionicons name="checkmark-circle" size={18} color="#FF5100" />
+                    </View>
+                    <View className="flex-1">
+                      <Typography variant="body2" color="secondary" weight="bold" className="text-[#0F2C59] font-outfit-bold">
+                        {benefit.title}
+                      </Typography>
+                      <Typography variant="caption" color="muted" className="text-gray-500 mt-0.5 font-outfit">
+                        {benefit.desc}
+                      </Typography>
+                    </View>
+                  </View>
+                  {i < coachBenefits.length - 1 && (
+                    <View className="h-[1px] bg-gray-100 my-2" />
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View className="mb-8 items-center">
+              <Typography variant="h1" color="secondary" className="mb-2 font-bold text-center font-outfit-bold">
+                Create Account
+              </Typography>
+              <Typography variant="body1" color="muted" className="text-center font-outfit">
+                {registrationPhase === 'input' && "Get started by filling out your details below."}
+                {registrationPhase === 'email-verify' && "Verify your Email Address"}
+                {registrationPhase === 'phone-verify' && "Verify your Phone Number"}
+              </Typography>
+            </View>
+          )}
+
+          {role === 'coach' && registrationPhase === 'input' && (
+            <View className="flex-row justify-between items-center mb-6">
+              <Typography variant="h2" color="secondary" weight="bold" className="text-[#0F2C59] text-lg font-outfit-bold">
+                Coach Registration
+              </Typography>
+              <TouchableOpacity onPress={() => Alert.alert('Referral Code', 'Please enter your referral code:')}>
+                <Typography variant="caption" color="secondary" weight="semibold" className="font-outfit-semibold">
+                  Have A Referral Code? <Typography variant="caption" className="text-[#FF5100] font-outfit-bold" weight="bold">Enter</Typography>
+                </Typography>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {registrationPhase === 'input' && (
+            <View className="space-y-4 mb-8">
+              <TextInput 
+                label="Full Name"
+                placeholder="Enter full name" 
+                value={name} 
+                onChangeText={(text) => {
+                  setName(text);
+                  validateField('name', text);
+                }}
+                onBlur={() => validateField('name', name)}
+                error={errors.name}
+              />
+              
+              <TextInput 
+                label="Phone Number"
+                placeholder="Enter mobile number" 
+                keyboardType="phone-pad" 
+                value={phone} 
+                onChangeText={(text) => {
+                  setPhone(text);
+                  validateField('phone', text);
+                }}
+                onBlur={() => validateField('phone', phone)}
+                error={errors.phone}
+              />
+              
+              <TextInput 
+                label="Email"
+                placeholder="Enter your email" 
+                keyboardType="email-address" 
+                value={email} 
+                onChangeText={(text) => {
+                  setEmail(text);
+                  validateField('email', text);
+                }}
+                onBlur={() => validateField('email', email)}
+                autoCapitalize="none" 
+                error={errors.email}
+              />
+              
+              <TextInput 
+                label="Password"
+                placeholder="Create a password" 
+                secureTextEntry 
+                isPassword
+                value={password} 
+                onChangeText={(text) => {
+                  setPassword(text);
+                  validateField('password', text);
+                }}
+                onBlur={() => validateField('password', password)}
+                error={errors.password}
+              />
+
+              {role === 'coach' && (
+                <View className="mb-4">
+                  <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold">Select Sports</Typography>
+                  <View className="flex-row flex-wrap gap-2 mt-1">
+                    {sportsList.map((sport: string) => {
+                      const isSelected = selectedSports.includes(sport);
+                      return (
+                        <TouchableOpacity 
+                          key={sport} 
+                          onPress={() => toggleSport(sport)}
+                          activeOpacity={0.8}
+                          className={`px-4 py-2 rounded-full border ${isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-300'}`}
+                        >
+                          <Typography variant="caption" color={isSelected ? 'white' : 'muted'} weight="bold" className="font-outfit-bold">
+                            {sport}
+                          </Typography>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {errors.sports && (
+                    <Typography variant="caption" color="error" className="mt-2 ml-1 font-outfit">
+                      {errors.sports}
+                    </Typography>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          {registrationPhase === 'email-verify' && (
+             <View className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8 items-center">
+               <Ionicons name="mail-unread-outline" size={48} color="#FF5722" className="mb-4" />
+               <Typography variant="h2" color="secondary" weight="bold" className="mb-2 text-center font-outfit-bold">
+                 Check Your Email
+               </Typography>
+               <Typography variant="body2" color="muted" className="text-center mb-6 font-outfit">
+                 We've sent a verification link to {email}. Please click the link to verify your account.
+               </Typography>
+               <ActivityIndicator size="large" color="#FF5722" />
+               <Typography variant="caption" color="primary" weight="bold" className="mt-4 font-outfit-bold">
+                 {verifyFirebaseMutation.isPending ? "Finalizing registration..." : "Waiting for verification..."}
+               </Typography>
+             </View>
+          )}
+
+          {registrationPhase === 'phone-verify' && (
+            <View className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
+              <View className="items-center mb-6">
+                <Ionicons name="phone-portrait-outline" size={48} color="#FF5722" className="mb-2" />
+                <Typography variant="h2" color="secondary" weight="bold" className="mb-2 text-center font-outfit-bold">
+                  Verify Phone
+                </Typography>
+                <Typography variant="body2" color="muted" className="text-center font-outfit">
+                  We need to verify {phone} to secure your coach profile.
+                </Typography>
+              </View>
+
+              {!verificationId ? (
+                <Button 
+                  title="Send SMS Code" 
+                  onPress={sendPhoneOtp} 
+                  isLoading={isFirebaseLoading}
+                />
+              ) : (
+                <View>
+                  <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-2 font-outfit-bold">Enter OTP</Typography>
+                  <TextInput 
+                    placeholder="_ _ _ _ _ _" 
+                    value={otp} 
+                    onChangeText={setOtp} 
+                    keyboardType="number-pad" 
+                  />
+                  <View className="mt-4">
+                    <Button 
+                      title="Verify & Complete Registration" 
+                      onPress={verifyPhoneAndLink} 
+                      isLoading={isFirebaseLoading || verifyFirebaseMutation.isPending} 
+                    />
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View className="mb-12">
+            {registrationPhase === 'input' && (
+              <Button 
+                title="Continue" 
+                isLoading={step1Mutation.isPending || directRegisterMutation.isPending}
+                onPress={handleInitialSubmit}
+              />
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
