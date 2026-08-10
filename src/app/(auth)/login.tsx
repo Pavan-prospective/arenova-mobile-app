@@ -18,6 +18,37 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [screenError, setScreenError] = useState<string | null>(null);
+
+  const sanitizeErrorMessage = (errorMsg: string): string => {
+    if (!errorMsg) return 'An unexpected error occurred. Please try again.';
+    let message = errorMsg;
+    if (message.includes('auth/invalid-email') || message.includes('invalid-email')) {
+      return 'The email address is invalid. Please enter a correct email.';
+    }
+    if (message.includes('auth/user-not-found') || message.includes('user-not-found') || message.includes('auth/invalid-credential')) {
+      return 'Invalid email or password. Please check your credentials or register first.';
+    }
+    if (message.includes('auth/wrong-password') || message.includes('wrong-password')) {
+      return 'Incorrect password. Please try again.';
+    }
+    if (message.includes('auth/email-already-in-use') || message.includes('email-already-in-use')) {
+      return 'This email address is already in use by another account.';
+    }
+    if (message.includes('auth/weak-password') || message.includes('weak-password')) {
+      return 'The password is too weak. Please use a stronger password.';
+    }
+    if (message.includes('auth/network-request-failed')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+    if (message.includes('auth/too-many-requests')) {
+      return 'Too many login attempts. Please try again later or reset your password.';
+    }
+    message = message.replace(/^Firebase:\s*/i, '');
+    message = message.replace(/^Error:\s*/i, '');
+    message = message.replace(/\(auth\/[^)]+\)\.?/g, '');
+    return message.trim();
+  };
   
   const [isLoading, setIsLoading] = useState(false);
   
@@ -49,7 +80,7 @@ export default function LoginScreen() {
     },
     onError: (error: any) => {
       setIsLoading(false);
-      Alert.alert('Login Error', error?.response?.data?.message || 'Verification failed');
+      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Verification failed'));
     }
   });
 
@@ -94,7 +125,7 @@ export default function LoginScreen() {
     },
     onError: (error: any) => {
       setIsLoading(false);
-      Alert.alert('Login Error', error?.response?.data?.message || 'Verification failed');
+      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Verification failed'));
     }
   });
 
@@ -149,6 +180,7 @@ export default function LoginScreen() {
       return;
     }
     
+    setScreenError(null);
     setIsLoading(true);
     if (role === 'coach') {
       try {
@@ -157,7 +189,7 @@ export default function LoginScreen() {
         verifyFirebaseMutation.mutate(idToken);
       } catch (err: any) {
         setIsLoading(false);
-        Alert.alert('Login Error', err.message);
+        setScreenError(sanitizeErrorMessage(err.message));
       }
     } else {
       directLoginMutation.mutate();
@@ -192,6 +224,23 @@ export default function LoginScreen() {
               {authMode === 'phone' ? 'Enter your mobile number to receive a one-time OTP.' : 'Enter your email and password to login.'}
             </Typography>
           </View>
+
+          {screenError && (
+            <View className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
+              <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+              <View className="flex-1">
+                <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                  Authentication Error
+                </Typography>
+                <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                  {screenError}
+                </Typography>
+              </View>
+              <TouchableOpacity onPress={() => setScreenError(null)} className="p-1 -mr-1 -mt-1">
+                <Ionicons name="close" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Toggle Button */}
           <View className="flex-row bg-gray-200 rounded-full p-1 mb-8">
@@ -273,10 +322,7 @@ export default function LoginScreen() {
                 title="Send OTP" 
                 disabled={phoneNumber.length < 10}
                 onPress={() => {
-                  Alert.alert(
-                    'Phone Authentication', 
-                    'Phone login is currently under maintenance. Please use Email & Password to log in for now.'
-                  );
+                  setScreenError('Phone login is currently under maintenance. Please use Email & Password to log in.');
                 }}
               />
             ) : (

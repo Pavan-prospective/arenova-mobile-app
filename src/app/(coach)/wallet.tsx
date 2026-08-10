@@ -29,6 +29,7 @@ export default function WalletScreen() {
   const [accountNumber, setAccountNumber] = useState('');
   const [confirmAccountNumber, setConfirmAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // 1. Fetch Wallet Summary
   const { data: summaryResponse, isLoading: isSummaryLoading, refetch: refetchSummary } = useQuery({
@@ -139,6 +140,7 @@ export default function WalletScreen() {
       queryClient.invalidateQueries({ queryKey: ['walletTransactions'] });
       queryClient.invalidateQueries({ queryKey: ['walletWithdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['coachDashboard'] });
+      setSubmitError(null);
 
       Alert.alert(
         'Payout Requested',
@@ -152,36 +154,36 @@ export default function WalletScreen() {
       );
     },
     onError: (err: any) => {
-      Alert.alert(
-        'Withdrawal Error',
+      setSubmitError(
         err?.response?.data?.message || err?.message || 'Failed to request withdrawal. Try again.'
       );
     }
   });
 
   const handleWithdrawal = () => {
+    setSubmitError(null);
     const withdrawAmount = parseFloat(amount);
     if (isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid withdrawal amount.');
+      setSubmitError('Please enter a valid withdrawal amount.');
       return;
     }
     if (withdrawAmount > balance) {
-      Alert.alert('Insufficient Balance', 'Withdrawal amount exceeds your available balance.');
+      setSubmitError('Withdrawal amount exceeds your available balance.');
       return;
     }
 
     if (withdrawTab === 'upi') {
       if (!upiId || !upiId.includes('@')) {
-        Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. coachname@ybl).');
+        setSubmitError('Please enter a valid UPI ID (e.g. coachname@ybl).');
         return;
       }
     } else {
       if (!accountName || !accountNumber || !confirmAccountNumber || !ifscCode) {
-        Alert.alert('Required Fields', 'Please fill in all bank details.');
+        setSubmitError('Please fill in all bank details.');
         return;
       }
       if (accountNumber !== confirmAccountNumber) {
-        Alert.alert('Mismatched Accounts', 'Account number and confirmation do not match.');
+        setSubmitError('Account number and confirmation do not match.');
         return;
       }
     }
@@ -254,6 +256,23 @@ export default function WalletScreen() {
             </Typography>
 
             <View className="bg-white rounded-3xl p-5 mb-6 shadow-sm border border-gray-100">
+              {submitError && (
+                <View className="mb-5 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm">
+                  <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+                  <View className="flex-1">
+                    <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                      Request Failed
+                    </Typography>
+                    <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                      {submitError}
+                    </Typography>
+                  </View>
+                  <TouchableOpacity onPress={() => setSubmitError(null)} className="p-1 -mr-1 -mt-1">
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Payment Method Selector Tabs */}
               <View className="flex-row bg-[#EEF3F9] rounded-full p-1 mb-6">
                 <TouchableOpacity 

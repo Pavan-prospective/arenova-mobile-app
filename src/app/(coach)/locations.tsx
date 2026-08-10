@@ -208,6 +208,8 @@ export default function LocationsScreen() {
 
   // Form errors
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
 
   // Query locations
   const { data: locationsResponse, isLoading, refetch, isRefetching } = useQuery({
@@ -232,11 +234,12 @@ export default function LocationsScreen() {
       if (!selectedLocationId && newLocId) {
         setSelectedLocationId(newLocId);
       }
+      setSubmitError(null);
       closeForm();
       Alert.alert('Success', 'Coaching location created successfully!');
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to create location');
+      setSubmitError(err.response?.data?.message || err.message || 'Failed to create location');
     }
   });
 
@@ -247,11 +250,12 @@ export default function LocationsScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['coachLocations'] });
+      setSubmitError(null);
       closeForm();
       Alert.alert('Success', 'Coaching location updated successfully!');
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to update location');
+      setSubmitError(err.response?.data?.message || err.message || 'Failed to update location');
     }
   });
 
@@ -265,10 +269,11 @@ export default function LocationsScreen() {
       if (selectedLocationId === id) {
         setSelectedLocationId(null);
       }
+      setListError(null);
       Alert.alert('Success', 'Location deactivated successfully.');
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.message || 'Failed to deactivate location');
+      setListError(err.response?.data?.message || err.message || 'Failed to deactivate location');
     }
   });
 
@@ -303,6 +308,8 @@ export default function LocationsScreen() {
     setRadius('50');
     setErrors({});
     setTempMapData(null);
+    setSubmitError(null);
+    setListError(null);
     setMapInitCoords(null);
     setEditingId(null);
   };
@@ -414,6 +421,23 @@ export default function LocationsScreen() {
           className="flex-1 px-4 pt-4"
           contentContainerStyle={{ paddingBottom: 100 }}
         >
+          {listError && (
+            <View className="mb-5 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm">
+              <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+              <View className="flex-1">
+                <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                  Deactivation Failed
+                </Typography>
+                <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                  {listError}
+                </Typography>
+              </View>
+              <TouchableOpacity onPress={() => setListError(null)} className="p-1 -mr-1 -mt-1">
+                <Ionicons name="close" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Helper Banner */}
           <View className="bg-orange-50 border border-orange-100 rounded-2xl p-4 mb-5 flex-row">
             <Ionicons name="information-circle" size={20} color="#FF5100" className="mr-3 mt-0.5" />
@@ -541,6 +565,23 @@ export default function LocationsScreen() {
           className="flex-1 px-5 pt-6"
           contentContainerStyle={{ paddingBottom: 60 }}
         >
+          {submitError && (
+            <View className="mb-5 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
+              <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+              <View className="flex-1">
+                <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                  Save Failed
+                </Typography>
+                <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                  {submitError}
+                </Typography>
+              </View>
+              <TouchableOpacity onPress={() => setSubmitError(null)} className="p-1 -mr-1 -mt-1">
+                <Ionicons name="close" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Helper instructions */}
           <View className="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 flex-row">
             <Ionicons name="map" size={20} color="#3B82F6" className="mr-3 mt-0.5" />

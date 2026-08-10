@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Modal, Share, Clipboard, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
@@ -22,6 +22,11 @@ export default function ProfileScreen() {
   const [description, setDescription] = useState(user?.description || '');
   const [sports, setSports] = useState(user?.sports?.join(', ') || '');
   const [idProof, setIdProof] = useState(user?.idProof || '');
+
+  const [avatarUri, setAvatarUri] = useState<string | null>(user?.avatar || null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isReferralModalVisible, setIsReferralModalVisible] = useState(false);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -60,6 +65,9 @@ export default function ProfileScreen() {
       setLocation(profile.profile?.address?.city || '');
       setDescription(profile.profile?.description || profile.profile?.bio || '');
       setSports(profile.profile?.sports?.join(', ') || '');
+      if (profile.avatar || profile.profile?.avatar) {
+        setAvatarUri(profile.avatar || profile.profile?.avatar);
+      }
     }
   }, [profile]);
 
@@ -88,6 +96,7 @@ export default function ProfileScreen() {
       return res.data;
     },
     onSuccess: (data, variables) => {
+      setIsSaving(false);
       queryClient.setQueryData(['coachProfile'], (oldData: any) => {
         if (!oldData) return data?.data || data;
         const updatedUser = data?.data || data;
@@ -103,6 +112,7 @@ export default function ProfileScreen() {
             bio: variables.bio !== undefined ? variables.bio : oldData.profile?.bio,
             description: variables.description !== undefined ? variables.description : oldData.profile?.description,
             address: variables.address !== undefined ? variables.address : oldData.profile?.address,
+            avatar: variables.avatar !== undefined ? variables.avatar : oldData.profile?.avatar,
           }
         };
       });
@@ -114,15 +124,89 @@ export default function ProfileScreen() {
         setUser({
           ...user,
           name: name,
+          avatar: variables.avatar || user.avatar,
         });
       }
     },
     onError: (err: any) => {
-      Alert.alert('Error Updating Profile', err?.response?.data?.message || err.message);
+      setIsSaving(false);
+      setSubmitError(err?.response?.data?.message || err.message || 'Failed to update profile');
     }
   });
 
-  const handleSaveProfile = () => {
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setSubmitError('Camera roll permissions are required to upload a profile picture!');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedUri = result.assets[0].uri;
+      setAvatarUri(selectedUri);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setSubmitError(null);
+    setName(user?.name || '');
+    setPhone(user?.phone || '');
+    setExperience(user?.experience || '');
+    setLocation(user?.location || '');
+    setDescription(user?.description || '');
+    setSports(user?.sports?.join(', ') || '');
+    setIdProof(user?.idProof || '');
+    setAvatarUri(user?.avatar || null);
+
+    if (profile) {
+      setName(profile.name || '');
+      setPhone(profile.phone || profile.phoneNumber || '');
+      setExperience(profile.profile?.experience ? profile.profile.experience.toString() : '');
+      setLocation(profile.profile?.address?.city || '');
+      setDescription(profile.profile?.description || profile.profile?.bio || '');
+      setSports(profile.profile?.sports?.join(', ') || '');
+      if (profile.avatar || profile.profile?.avatar) {
+        setAvatarUri(profile.avatar || profile.profile?.avatar);
+      }
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSubmitError(null);
+    setIsSaving(true);
+
+    let uploadedAvatarUrl = null;
+    if (avatarUri && (avatarUri.startsWith('file://') || avatarUri.startsWith('content://'))) {
+      try {
+        const formData = new FormData();
+        const fileType = avatarUri.split('.').pop() || 'jpg';
+        const fileName = avatarUri.split('/').pop() || `avatar.${fileType}`;
+        
+        formData.append('avatar', {
+          uri: avatarUri,
+          name: fileName,
+          type: `image/${fileType === 'png' ? 'png' : 'jpeg'}`,
+        } as any);
+
+        const uploadRes = await api.post('/users/me/avatar', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        uploadedAvatarUrl = uploadRes.data?.data?.avatar || uploadRes.data?.avatar || uploadRes.data?.data?.url || uploadRes.data?.url;
+      } catch (uploadErr: any) {
+        setIsSaving(false);
+        setSubmitError('Failed to upload profile picture: ' + (uploadErr?.response?.data?.message || uploadErr.message));
+        return;
+      }
+    }
+
     if (user?.role === 'coach') {
       const payload: any = {
         name,
@@ -135,6 +219,10 @@ export default function ProfileScreen() {
         }
       };
 
+      if (uploadedAvatarUrl) {
+        payload.avatar = uploadedAvatarUrl;
+      }
+
       payload.profile = {
         bio: description,
         description,
@@ -144,6 +232,10 @@ export default function ProfileScreen() {
           city: location
         }
       };
+      if (uploadedAvatarUrl) {
+        payload.profile.avatar = uploadedAvatarUrl;
+      }
+
       payload.coach = {
         bio: description,
         description,
@@ -163,8 +255,10 @@ export default function ProfileScreen() {
           experience,
           location,
           description,
-          idProof
+          idProof,
+          avatar: uploadedAvatarUrl || avatarUri || user.avatar,
         });
+        setIsSaving(false);
         setIsEditing(false);
         Alert.alert('Success', 'Profile updated successfully!');
       }
@@ -173,6 +267,7 @@ export default function ProfileScreen() {
 
   const standardMenuItems = [
     { id: 'family', title: 'My Family Tree', icon: 'people-outline', route: user?.role === 'parent' ? '/(parent)/(parent-tabs)/family-tree' : null },
+    { id: 'referral', title: 'Refer & Share App', icon: 'share-social-outline', route: null },
     { id: 'settings', title: 'Settings & Preferences', icon: 'settings-outline', route: '/settings' },
     { id: 'logout', title: 'Sign Out', icon: 'log-out-outline', route: '/(auth)' },
   ];
@@ -180,6 +275,7 @@ export default function ProfileScreen() {
   const coachMenuItems = [
     { id: 'wallet', title: 'Wallet & Withdrawals', icon: 'wallet-outline', route: '/(coach)/wallet' },
     { id: 'locations', title: 'Coaching Locations', icon: 'location-outline', route: '/locations' },
+    { id: 'referral', title: 'Refer & Share App', icon: 'share-social-outline', route: null },
     { id: 'settings', title: 'Settings & Preferences', icon: 'settings-outline', route: '/settings' },
     { id: 'logout', title: 'Sign Out', icon: 'log-out-outline', route: '/(auth)' },
   ];
@@ -216,6 +312,13 @@ export default function ProfileScreen() {
           color: "#0F2C59", // Navy
           bgColor: "bg-blue-50 border-blue-100/50"
         };
+      case 'referral':
+        return {
+          title: "Refer & Share App",
+          desc: "Invite your friends to Arenova and share your referral code",
+          color: "#8B5CF6", // Purple
+          bgColor: "bg-purple-50 border-purple-100/50"
+        };
       default:
         return {
           title: "Sign Out",
@@ -224,6 +327,82 @@ export default function ProfileScreen() {
           bgColor: "bg-red-50 border-red-100/50"
         };
     }
+  };
+
+  const getInitials = (fullName: string | undefined | null) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '';
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const renderAvatarContent = () => {
+    const activeAvatar = avatarUri || profile?.avatar || user?.avatar || profile?.profile?.avatar;
+    if (activeAvatar) {
+      return (
+        <Image 
+          source={{ uri: activeAvatar }} 
+          className="w-full h-full"
+          resizeMode="cover"
+        />
+      );
+    }
+
+    const resolvedName = displayProfile.name;
+    if (!resolvedName || resolvedName.trim() === '' || resolvedName === 'Coach Name' || resolvedName === 'User Profile') {
+      return <Ionicons name="person-circle-outline" size={68} color="white" />;
+    }
+
+    const initials = getInitials(resolvedName);
+    if (!initials) {
+      return <Ionicons name="person-circle-outline" size={68} color="white" />;
+    }
+
+    return (
+      <Typography variant="h2" color="white" weight="bold" className="font-outfit-bold text-2xl">
+        {initials}
+      </Typography>
+    );
+  };
+
+  const referralCode = user?.id ? `${(profile?.name || user?.name || 'USER').split(' ')[0].toUpperCase()}${user.id.substring(Math.max(0, user.id.length - 4)).toUpperCase()}` : 'ARENOVA10';
+
+  const handleShareReferral = async () => {
+    const shareMessage = `Hey! Join me on Arenova! Register as a player or parent using my referral code: ${referralCode} and get access to top-tier sports coaching. Download the app today!`;
+    try {
+      await Share.share({
+        message: shareMessage,
+      });
+    } catch (error: any) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleShareWhatsApp = async () => {
+    const shareMessage = `Hey! Join me on Arenova! Register as a player or parent using my referral code: ${referralCode} and get access to top-tier sports coaching. Download the app today!`;
+    const url = `whatsapp://send?text=${encodeURIComponent(shareMessage)}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        await Share.share({
+          message: shareMessage,
+        });
+      }
+    } catch (err) {
+      await Share.share({
+        message: shareMessage,
+      });
+    }
+  };
+
+  const handleCopyReferralCode = async () => {
+    Clipboard.setString(referralCode);
+    Alert.alert('Copied!', 'Referral code copied to clipboard.');
   };
 
   return (
@@ -243,6 +422,24 @@ export default function ProfileScreen() {
             <ActivityIndicator size="large" color="#FF5100" style={{ marginTop: 40 }} />
           ) : (
             <>
+              {/* On-Screen Error Banner */}
+              {submitError && (
+                <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm">
+                  <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+                  <View className="flex-1">
+                    <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                      Update Failed
+                    </Typography>
+                    <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                      {submitError}
+                    </Typography>
+                  </View>
+                  <TouchableOpacity onPress={() => setSubmitError(null)} className="p-1 -mr-1 -mt-1">
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               {/* Header Profile Summary Panel */}
               <View className="bg-secondary rounded-3xl p-6 mb-6 shadow-md relative overflow-hidden">
                 <View className="absolute right-0 top-0 opacity-10">
@@ -251,13 +448,16 @@ export default function ProfileScreen() {
 
                 <View className="flex-row items-center">
                   <TouchableOpacity 
-                    className="w-20 h-20 rounded-full bg-white/20 border-2 border-white/50 items-center justify-center mr-4 relative overflow-hidden"
+                    className="w-20 h-20 rounded-full bg-white/20 border-2 border-white/50 items-center justify-center mr-4 relative overflow-hidden shadow-sm"
                     disabled={!isEditing}
-                    onPress={() => isEditing && Alert.alert('Update Photo', 'Photo uploads are enabled inside document proof picking.')}
+                    onPress={handlePickAvatar}
                   >
-                    <Typography variant="h2" color="white" weight="bold" className="font-outfit-bold">
-                      {user?.name ? user.name.substring(0, 2).toUpperCase() : 'CO'}
-                    </Typography>
+                    {renderAvatarContent()}
+                    {isEditing && (
+                      <View className="absolute inset-0 bg-black/40 items-center justify-center">
+                        <Ionicons name="camera" size={20} color="white" />
+                      </View>
+                    )}
                   </TouchableOpacity>
 
                   <View className="flex-1">
@@ -281,8 +481,11 @@ export default function ProfileScreen() {
 
                   {!isEditing && (
                     <TouchableOpacity 
-                      onPress={() => setIsEditing(true)} 
-                      className="w-10 h-10 bg-white/20 rounded-full items-center justify-center border border-white/30"
+                      onPress={() => {
+                        setIsEditing(true);
+                        setSubmitError(null);
+                      }} 
+                      className="w-10 h-10 bg-primary rounded-full items-center justify-center shadow-sm border border-primary"
                     >
                       <Ionicons name="pencil" size={18} color="white" />
                     </TouchableOpacity>
@@ -515,8 +718,22 @@ export default function ProfileScreen() {
 
               {/* Save Changes Buttons */}
               {isEditing && (
-                <View className="mb-5">
-                  <Button title="Save Profile Changes" onPress={handleSaveProfile} />
+                <View className="mb-6 flex-row gap-3">
+                  <View className="flex-1">
+                    <Button 
+                      title="Cancel" 
+                      variant="white"
+                      onPress={handleCancelEdit} 
+                      disabled={isSaving || updateProfileMutation.isPending}
+                    />
+                  </View>
+                  <View className="flex-[2] flex-grow">
+                    <Button 
+                      title="Save Changes" 
+                      onPress={handleSaveProfile} 
+                      isLoading={isSaving || updateProfileMutation.isPending}
+                    />
+                  </View>
                 </View>
               )}
             </>
@@ -542,6 +759,8 @@ export default function ProfileScreen() {
                           }
                         }
                       ]);
+                    } else if (item.id === 'referral') {
+                      setIsReferralModalVisible(true);
                     } else if (item.route) {
                       router.push(item.route as any);
                     }
@@ -573,6 +792,85 @@ export default function ProfileScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Referral bottom sheet Modal */}
+      <Modal
+        visible={isReferralModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsReferralModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity 
+            className="flex-1" 
+            activeOpacity={1} 
+            onPress={() => setIsReferralModalVisible(false)} 
+          />
+          <View className="bg-white rounded-t-3xl p-6 shadow-xl pb-10">
+            <View className="flex-row justify-between items-center mb-6">
+              <Typography variant="h2" color="secondary" className="font-outfit-bold">
+                Refer & Invite
+              </Typography>
+              <TouchableOpacity onPress={() => setIsReferralModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#0F2C59" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="items-center mb-6">
+              <View className="w-16 h-16 rounded-full bg-purple-50 items-center justify-center mb-4">
+                <Ionicons name="gift-outline" size={32} color="#8B5CF6" />
+              </View>
+              <Typography variant="subtitle1" color="secondary" weight="bold" className="text-center font-outfit-bold mb-2">
+                Share Arenova & Build Your Network
+              </Typography>
+              <Typography variant="body2" color="muted" className="text-center font-outfit px-4">
+                Invite parents and player students to sign up on Arenova. Share your unique referral code with them!
+              </Typography>
+            </View>
+
+            {/* Referral Code Box */}
+            <View className="bg-purple-50/50 border border-purple-100 rounded-2xl p-4 flex-row items-center justify-between mb-6">
+              <View>
+                <Typography variant="caption" color="muted" className="font-outfit">Your Referral Code</Typography>
+                <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold tracking-wider mt-0.5 text-purple-900">
+                  {referralCode}
+                </Typography>
+              </View>
+              <TouchableOpacity 
+                onPress={handleCopyReferralCode}
+                className="bg-white px-4 py-2 rounded-full border border-purple-200 active:bg-purple-50 flex-row items-center"
+              >
+                <Ionicons name="copy-outline" size={14} color="#8B5CF6" className="mr-1.5" />
+                <Typography variant="caption" color="secondary" weight="bold" className="font-outfit-bold text-purple-600 text-xs">Copy</Typography>
+              </TouchableOpacity>
+            </View>
+
+            {/* Sharing Options */}
+            <View className="space-y-3">
+              <TouchableOpacity 
+                onPress={handleShareWhatsApp}
+                className="w-full bg-[#25D366] h-14 rounded-full flex-row items-center justify-center active:opacity-90"
+              >
+                <Ionicons name="logo-whatsapp" size={20} color="white" className="mr-2" />
+                <Typography color="white" weight="bold" className="font-outfit-bold">
+                  Share via WhatsApp
+                </Typography>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={handleShareReferral}
+                className="w-full bg-secondary h-14 rounded-full flex-row items-center justify-center active:opacity-90 border border-secondary"
+              >
+                <Ionicons name="share-social-outline" size={20} color="white" className="mr-2" />
+                <Typography color="white" weight="bold" className="font-outfit-bold">
+                  Other Share Options
+                </Typography>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }

@@ -22,6 +22,7 @@ interface User {
   isEmailVerified?: boolean;
   skills?: string;
   idProof?: string;
+  avatar?: string;
 }
 
 interface AuthState {

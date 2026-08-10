@@ -57,6 +57,40 @@ export default function RegisterScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [registrationPhase, setRegistrationPhase] = useState<'input' | 'email-verify' | 'phone-verify'>('input');
+  const [screenError, setScreenError] = useState<string | null>(null);
+  const [screenSuccess, setScreenSuccess] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState('');
+  const [showReferralInput, setShowReferralInput] = useState(false);
+
+  const sanitizeErrorMessage = (errorMsg: string): string => {
+    if (!errorMsg) return 'An unexpected error occurred. Please try again.';
+    let message = errorMsg;
+    if (message.includes('auth/invalid-email') || message.includes('invalid-email')) {
+      return 'The email address is invalid. Please enter a correct email.';
+    }
+    if (message.includes('auth/user-not-found') || message.includes('user-not-found') || message.includes('auth/invalid-credential')) {
+      return 'Invalid email or password. Please check your credentials or register first.';
+    }
+    if (message.includes('auth/wrong-password') || message.includes('wrong-password')) {
+      return 'Incorrect password. Please try again.';
+    }
+    if (message.includes('auth/email-already-in-use') || message.includes('email-already-in-use')) {
+      return 'This email address is already in use by another account.';
+    }
+    if (message.includes('auth/weak-password') || message.includes('weak-password')) {
+      return 'The password is too weak. Please use a stronger password.';
+    }
+    if (message.includes('auth/network-request-failed')) {
+      return 'Network error. Please check your internet connection and try again.';
+    }
+    if (message.includes('auth/too-many-requests')) {
+      return 'Too many login attempts. Please try again later or reset your password.';
+    }
+    message = message.replace(/^Firebase:\s*/i, '');
+    message = message.replace(/^Error:\s*/i, '');
+    message = message.replace(/\(auth\/[^)]+\)\.?/g, '');
+    return message.trim();
+  };
   
   const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
   const recaptchaVerifier = useRef<any>(null);
@@ -90,29 +124,33 @@ export default function RegisterScreen() {
         phone,
         phoneNumber: phone,
         sports: selectedSports,
+        referralCode: referralCode || undefined
       };
       const response = await api.post('/auth/coach/register-step1', payload);
       return response.data;
     },
     onSuccess: () => {
+      setScreenError(null);
       startEmailVerification();
     },
     onError: (error: any) => {
-      Alert.alert('Registration Error', error?.response?.data?.message || 'Pre-registration check failed');
+      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Pre-registration check failed'));
     }
   });
 
   const startEmailVerification = async () => {
     setRegistrationPhase('email-verify');
     setIsFirebaseLoading(true);
+    setScreenError(null);
+    setScreenSuccess(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await sendEmailVerification(userCredential.user);
       setIsFirebaseLoading(false);
-      Alert.alert("Email Sent", "Please check your inbox and click the verification link.");
+      setScreenSuccess("Please check your inbox and click the verification link.");
     } catch (err: any) {
       setIsFirebaseLoading(false);
-      Alert.alert('Email Auth Error', err.message);
+      setScreenError(sanitizeErrorMessage(err.message));
     }
   };
 
@@ -128,7 +166,7 @@ export default function RegisterScreen() {
               const idToken = await getIdToken(auth.currentUser, true);
               verifyFirebaseMutation.mutate(idToken);
             } catch (err: any) {
-              Alert.alert('Auth Error', err.message);
+              setScreenError(sanitizeErrorMessage(err.message));
             }
           }
         }
@@ -139,9 +177,11 @@ export default function RegisterScreen() {
 
   const sendPhoneOtp = async () => {
     if (!phone) {
-      Alert.alert('Error', 'Phone number is required.');
+      setScreenError('Phone number is required.');
       return;
     }
+    setScreenError(null);
+    setScreenSuccess(null);
     try {
       setIsFirebaseLoading(true);
       const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
@@ -149,10 +189,11 @@ export default function RegisterScreen() {
       const vId = await provider.verifyPhoneNumber(formattedPhone, recaptchaVerifier.current);
       setVerificationId(vId);
       setIsFirebaseLoading(false);
-      Alert.alert('OTP Sent', 'Check your messages for the verification code.');
+      setScreenSuccess('Check your messages for the OTP verification code.');
+      setRegistrationPhase('phone-verify');
     } catch (err: any) {
       setIsFirebaseLoading(false);
-      Alert.alert('SMS Error', err.message);
+      setScreenError(sanitizeErrorMessage(err.message));
     }
   };
 
@@ -170,7 +211,7 @@ export default function RegisterScreen() {
       }
     } catch (err: any) {
       setIsFirebaseLoading(false);
-      Alert.alert('Linking Error', err.message);
+      setScreenError(sanitizeErrorMessage(err.message));
     }
   };
 
@@ -205,17 +246,15 @@ export default function RegisterScreen() {
           status: 'active',
           isRegistered: true,
         });
-        Alert.alert('Registration Successful', 'Welcome to Arenova!');
       } catch (loginError) {
-        Alert.alert(
-          'Registered Successfully', 
-          'Your account is created. Please log in with your email and password.',
-          [{ text: 'OK', onPress: () => router.replace({ pathname: '/(auth)/login', params: { role } }) }]
-        );
+        setScreenSuccess('Account created successfully! Please log in with your email and password.');
+        setTimeout(() => {
+          router.replace({ pathname: '/(auth)/login', params: { role } });
+        }, 3000);
       }
     },
     onError: (error: any) => {
-      Alert.alert('Registration Error', error?.response?.data?.message || 'Failed to register account');
+      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Failed to register account'));
     }
   });
 
@@ -248,7 +287,7 @@ export default function RegisterScreen() {
       router.push({ pathname: '/(coach)/onboarding', params: { role } });
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Final verification failed');
+      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Final verification failed'));
     }
   });
 
@@ -319,6 +358,8 @@ export default function RegisterScreen() {
       return;
     }
 
+    setScreenError(null);
+    setScreenSuccess(null);
     if (role === 'coach') {
       step1Mutation.mutate();
     } else {
@@ -345,6 +386,40 @@ export default function RegisterScreen() {
         </View>
 
         <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+          
+          {screenError && (
+            <View className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
+              <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+              <View className="flex-1">
+                <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                  Registration Error
+                </Typography>
+                <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                  {screenError}
+                </Typography>
+              </View>
+              <TouchableOpacity onPress={() => setScreenError(null)} className="p-1 -mr-1 -mt-1">
+                <Ionicons name="close" size={16} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {screenSuccess && (
+            <View className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
+              <Ionicons name="checkmark-circle" size={20} color="#10B981" className="mr-2.5 mt-0.5" />
+              <View className="flex-1">
+                <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-emerald-800">
+                  Success
+                </Typography>
+                <Typography variant="caption" className="font-outfit text-emerald-600 mt-0.5">
+                  {screenSuccess}
+                </Typography>
+              </View>
+              <TouchableOpacity onPress={() => setScreenSuccess(null)} className="p-1 -mr-1 -mt-1">
+                <Ionicons name="close" size={16} color="#10B981" />
+              </TouchableOpacity>
+            </View>
+          )}
           
           {role === 'coach' && registrationPhase === 'input' ? (
             <View className="mb-6 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -387,16 +462,27 @@ export default function RegisterScreen() {
               <Typography variant="h2" color="secondary" weight="bold" className="text-[#0F2C59] text-lg font-outfit-bold">
                 Coach Registration
               </Typography>
-              <TouchableOpacity onPress={() => Alert.alert('Referral Code', 'Please enter your referral code:')}>
-                <Typography variant="caption" color="secondary" weight="semibold" className="font-outfit-semibold">
-                  Have A Referral Code? <Typography variant="caption" className="text-[#FF5100] font-outfit-bold" weight="bold">Enter</Typography>
-                </Typography>
-              </TouchableOpacity>
+              {!showReferralInput && (
+                <TouchableOpacity onPress={() => setShowReferralInput(true)}>
+                  <Typography variant="caption" color="secondary" weight="semibold" className="font-outfit-semibold">
+                    Have A Referral Code? <Typography variant="caption" className="text-[#FF5100] font-outfit-bold" weight="bold">Enter</Typography>
+                  </Typography>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
           {registrationPhase === 'input' && (
             <View className="space-y-4 mb-8">
+              {role === 'coach' && showReferralInput && (
+                <TextInput 
+                  label="Referral Code (Optional)"
+                  placeholder="Enter referral code" 
+                  value={referralCode} 
+                  onChangeText={setReferralCode}
+                />
+              )}
+
               <TextInput 
                 label="Full Name"
                 placeholder="Enter full name" 

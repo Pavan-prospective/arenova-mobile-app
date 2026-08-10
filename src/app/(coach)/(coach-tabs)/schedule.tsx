@@ -44,7 +44,9 @@ export default function ScheduleScreen() {
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [locationCity, setLocationCity] = useState('');
-  const [capacity, setCapacity] = useState('10');
+  const [capacity, setCapacity] = useState('1');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   // Date Range State
   const [startDate, setStartDate] = useState('');
@@ -163,7 +165,7 @@ export default function ScheduleScreen() {
         daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"], // Simplified
         startTime: formatTime24(payload.startTime),
         endTime: formatTime24(payload.endTime),
-        capacity: parseInt(payload.capacity) || 10
+        capacity: parseInt(payload.capacity) || 1
       };
       
       const schedResponse = await api.post('/coach-app/schedules', schedPayload);
@@ -179,10 +181,12 @@ export default function ScheduleScreen() {
       setLocationName('');
       setLocationAddress('');
       setLocationCity('');
+      setCapacity('1');
       setFormErrors({});
+      setSubmitError(null);
     },
     onError: (error: any) => {
-      Alert.alert('Error Saving Slot', error?.response?.data?.message || error.message || 'Failed to save slot');
+      setSubmitError(error?.response?.data?.message || error.message || 'Failed to save slot');
     }
   });
 
@@ -196,14 +200,16 @@ export default function ScheduleScreen() {
 
   const deleteSlotMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/coach-app/schedules/${id}`);
+      const response = await api.delete(`/coach-app/schedules/${id}`);
+      return response.data;
     },
     onSuccess: () => {
       refetchSchedules();
+      setDeleteError(null);
       Alert.alert('Success', 'Slot deleted successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error Deleting Slot', error?.response?.data?.message || error.message || 'Failed to delete slot (already booked slots cannot be deleted)');
+      setDeleteError(error?.response?.data?.message || error.message || 'Failed to delete slot (already booked slots cannot be deleted)');
     }
   });
 
@@ -248,7 +254,7 @@ export default function ScheduleScreen() {
     return {
       id: sched._id || sched.id || Math.random().toString(),
       title: sched.title || 'Coaching Session',
-      type: `Capacity: ${sched.capacity || 10}`,
+      type: `Capacity: ${sched.capacity || 1} Person${(sched.capacity || 1) > 1 ? 's' : ''}`,
       date: dateDisplay,
       time: timeDisplay,
       duration: durationStr,
@@ -260,7 +266,7 @@ export default function ScheduleScreen() {
         locationName: loc?.name || sched.locationName || '',
         locationAddress: loc?.address || sched.locationAddress || '',
         locationCity: loc?.city || sched.locationCity || '',
-        capacity: sched.capacity ? sched.capacity.toString() : '10'
+        capacity: sched.capacity ? sched.capacity.toString() : '1'
       }
     };
   };
@@ -326,13 +332,14 @@ export default function ScheduleScreen() {
   const handleEditSlot = (slot: Slot) => {
     setEditingSlotId(slot.id);
     setNewTitle(slot.title);
+    setSubmitError(null);
     if (slot.raw) {
       setStartDate(slot.raw.startDateStr);
       setEndDate(slot.raw.endDateStr);
       setLocationName(slot.raw.locationName || '');
       setLocationAddress(slot.raw.locationAddress || '');
       setLocationCity(slot.raw.locationCity || '');
-      setCapacity(slot.raw.capacity || '10');
+      setCapacity(slot.raw.capacity === '2' ? '2' : '1');
       
       // Parse dates safely from the dynamic ISO fields
       setStartTime(new Date(slot.raw.startTimeIso));
@@ -345,7 +352,7 @@ export default function ScheduleScreen() {
       setLocationName('');
       setLocationAddress('');
       setLocationCity('');
-      setCapacity('10');
+      setCapacity('1');
     }
     setFormErrors({});
     setIsModalVisible(true);
@@ -376,8 +383,9 @@ export default function ScheduleScreen() {
               setLocationName('');
               setLocationAddress('');
               setLocationCity('');
-              setCapacity('10');
+              setCapacity('1');
               setFormErrors({});
+              setSubmitError(null);
               setIsModalVisible(true);
             }}
             activeOpacity={0.8}
@@ -391,6 +399,23 @@ export default function ScheduleScreen() {
         <Typography variant="body1" color="muted" className="mb-4 font-outfit">
           Manage dynamic slot availability configurations
         </Typography>
+
+        {deleteError && (
+          <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
+            <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+            <View className="flex-1">
+              <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                Deletion Failed
+              </Typography>
+              <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                {deleteError}
+              </Typography>
+            </View>
+            <TouchableOpacity onPress={() => setDeleteError(null)} className="p-1 -mr-1 -mt-1">
+              <Ionicons name="close" size={16} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {isSchedulesLoading ? (
           <ActivityIndicator size="large" color="#FF5100" style={{ marginTop: 40 }} />
@@ -448,6 +473,23 @@ export default function ScheduleScreen() {
                 </TouchableOpacity>
               </View>
 
+              {submitError && (
+                <View className="mb-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm">
+                  <Ionicons name="alert-circle" size={20} color="#EF4444" className="mr-2.5 mt-0.5" />
+                  <View className="flex-1">
+                    <Typography variant="subtitle2" weight="bold" className="font-outfit-bold text-red-800">
+                      Save Failed
+                    </Typography>
+                    <Typography variant="caption" className="font-outfit text-red-600 mt-0.5">
+                      {submitError}
+                    </Typography>
+                  </View>
+                  <TouchableOpacity onPress={() => setSubmitError(null)} className="p-1 -mr-1 -mt-1">
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View className="space-y-4 mb-6">
                 <TextInput 
                   label="Title"
@@ -504,13 +546,29 @@ export default function ScheduleScreen() {
 
                 <View className="flex-row gap-4 mb-4">
                   <View className="flex-1">
-                    <TextInput 
-                      label="Capacity"
-                      placeholder="e.g. 10"
-                      keyboardType="numeric"
-                      value={capacity}
-                      onChangeText={setCapacity}
-                    />
+                    <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold">
+                      Capacity
+                    </Typography>
+                    <View className="flex-row bg-gray-100 rounded-full p-1 h-14 items-center">
+                      <TouchableOpacity 
+                        onPress={() => setCapacity('1')}
+                        activeOpacity={0.8}
+                        className={`flex-1 h-full rounded-full items-center justify-center ${capacity === '1' ? 'bg-primary' : 'bg-transparent'}`}
+                      >
+                        <Typography color={capacity === '1' ? 'white' : 'secondary'} weight={capacity === '1' ? 'bold' : 'normal'} className="font-outfit text-sm">
+                          1 Person
+                        </Typography>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => setCapacity('2')}
+                        activeOpacity={0.8}
+                        className={`flex-1 h-full rounded-full items-center justify-center ${capacity === '2' ? 'bg-primary' : 'bg-transparent'}`}
+                      >
+                        <Typography color={capacity === '2' ? 'white' : 'secondary'} weight={capacity === '2' ? 'bold' : 'normal'} className="font-outfit text-sm">
+                          2 Persons
+                        </Typography>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <View className="flex-1">
                     <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold">Select Dates</Typography>
