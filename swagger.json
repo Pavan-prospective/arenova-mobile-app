@@ -10,7 +10,7 @@
   },
   "servers": [
     {
-      "url": "https://arenova-backend-production-8430.up.railway.app",
+      "url": "https://arenova-backend-production-3192.up.railway.app",
       "description": "Production server (Railway)"
     }
   ],
@@ -682,6 +682,22 @@
     {
       "name": "Admin",
       "description": "Admin panel operations (requires admin JWT)"
+    },
+    {
+      "name": "Novare Tournaments",
+      "description": "Public endpoints for Novare tournaments"
+    },
+    {
+      "name": "Novare Registration",
+      "description": "Endpoints for novare tournament registrations"
+    },
+    {
+      "name": "Novare Auth",
+      "description": "Novare Authentication endpoints"
+    },
+    {
+      "name": "Admin - Novare Tournaments",
+      "description": "Admin endpoints for Novare tournaments"
     }
   ],
   "paths": {
@@ -2599,6 +2615,983 @@
           },
           "404": {
             "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/api/novare/tournaments": {
+      "get": {
+        "summary": "Get public tournaments",
+        "tags": [
+          "Novare Tournaments"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "city",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of public tournaments"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/tournaments/{id}": {
+      "get": {
+        "summary": "Get public tournament by ID",
+        "tags": [
+          "Novare Tournaments"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tournament data"
+          },
+          "404": {
+            "description": "Tournament not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/tournaments/{id}/register": {
+      "post": {
+        "summary": "Register for a tournament category",
+        "tags": [
+          "Novare Registration"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Tournament ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "categoryName"
+                ],
+                "properties": {
+                  "categoryName": {
+                    "type": "string"
+                  },
+                  "partnerUserId": {
+                    "type": "string",
+                    "description": "Required if PAIR registration, optionally linking existing user"
+                  },
+                  "partnerName": {
+                    "type": "string",
+                    "description": "Required if PAIR registration"
+                  },
+                  "partnerPhone": {
+                    "type": "string",
+                    "description": "Required if PAIR registration"
+                  },
+                  "teamName": {
+                    "type": "string",
+                    "description": "Required if TEAM registration"
+                  },
+                  "teamMembers": {
+                    "type": "array",
+                    "description": "Required if TEAM registration",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registration created, returns payment order details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "registration": {
+                          "type": "object"
+                        },
+                        "order": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or tournament not accepting registrations"
+          },
+          "404": {
+            "description": "Tournament not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/registrations/{id}/verify-payment": {
+      "post": {
+        "summary": "Verify payment for a registration",
+        "tags": [
+          "Novare Registration"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registration ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "paymentOrderId",
+                  "paymentTransactionId",
+                  "paymentSignature"
+                ],
+                "properties": {
+                  "paymentOrderId": {
+                    "type": "string"
+                  },
+                  "paymentTransactionId": {
+                    "type": "string"
+                  },
+                  "paymentSignature": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment verified and registration confirmed"
+          },
+          "400": {
+            "description": "Invalid payment or not pending"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Registration not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/registrations/my": {
+      "get": {
+        "summary": "Get all registrations for the logged in user",
+        "tags": [
+          "Novare Registration"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of user registrations"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/registrations/{id}": {
+      "get": {
+        "summary": "Get a specific registration by ID",
+        "tags": [
+          "Novare Registration"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Registration ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registration details"
+          },
+          "403": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Registration not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/auth/sync": {
+      "post": {
+        "summary": "Sync user with Firebase token",
+        "tags": [
+          "Novare Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idToken"
+                ],
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "description": "Firebase ID token"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User synced successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "isNewUser": {
+                      "type": "boolean"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "phone": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/novare/auth/complete-profile": {
+      "post": {
+        "summary": "Complete profile for new Novare user",
+        "tags": [
+          "Novare Auth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "idToken",
+                  "firstName"
+                ],
+                "properties": {
+                  "idToken": {
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User already exists"
+          },
+          "201": {
+            "description": "Profile completed successfully"
+          },
+          "400": {
+            "description": "Bad request"
+          },
+          "401": {
+            "description": "Invalid token"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/admin/novare/tournaments": {
+      "post": {
+        "summary": "Create a new tournament",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "sport",
+                  "registrationType",
+                  "startDate",
+                  "endDate",
+                  "registrationStartDate",
+                  "registrationEndDate"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "sport": {
+                    "type": "string"
+                  },
+                  "registrationType": {
+                    "type": "string"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "registrationStartDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "registrationEndDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "rules": {
+                    "type": "string"
+                  },
+                  "venue": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "banner": {
+                    "type": "string"
+                  },
+                  "registrationFee": {
+                    "type": "number"
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "registrationType": {
+                          "type": "string"
+                        },
+                        "fee": {
+                          "type": "number"
+                        },
+                        "capacity": {
+                          "type": "number"
+                        },
+                        "minimumPlayers": {
+                          "type": "number"
+                        },
+                        "maximumPlayers": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tournament created successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get all tournaments",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sport",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "city",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tournaments"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/admin/novare/tournaments/{id}": {
+      "get": {
+        "summary": "Get tournament by ID",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tournament data"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a tournament",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "sport": {
+                    "type": "string"
+                  },
+                  "registrationType": {
+                    "type": "string"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "registrationStartDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "registrationEndDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "rules": {
+                    "type": "string"
+                  },
+                  "venue": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "banner": {
+                    "type": "string"
+                  },
+                  "registrationFee": {
+                    "type": "number"
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "registrationType": {
+                          "type": "string"
+                        },
+                        "fee": {
+                          "type": "number"
+                        },
+                        "capacity": {
+                          "type": "number"
+                        },
+                        "minimumPlayers": {
+                          "type": "number"
+                        },
+                        "maximumPlayers": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tournament updated successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a tournament",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tournament deleted"
+          },
+          "400": {
+            "description": "Validation error"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/admin/novare/tournaments/{id}/status": {
+      "patch": {
+        "summary": "Update tournament status",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated"
+          },
+          "400": {
+            "description": "Invalid transition"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/admin/novare/tournaments/{id}/registrations": {
+      "get": {
+        "summary": "Get registrations for a tournament",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "registrationType",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paymentStatus",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "registrationStatus",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of registrations"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/admin/novare/tournaments/{id}/registrations/export": {
+      "get": {
+        "summary": "Export registrations to excel",
+        "tags": [
+          "Admin - Novare Tournaments"
+        ],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Excel file download",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
           }
         }
       }

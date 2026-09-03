@@ -47,10 +47,16 @@ export default function CoachActivityScreen() {
 
   const mapSessionToUI = (session: any) => {
     const id = session._id || session.id || Math.random().toString();
-    const studentName = session.student?.name || session.user?.name || session.studentName || 'Student';
-    const subtitle = session.sport || 'Session';
-    const rawDate = session.date || '';
-    const rawTime = session.time || '';
+    const studentName = 
+      session.bookedBy?.name || 
+      session.participant?.name || 
+      session.student?.name || 
+      session.user?.name || 
+      session.studentName || 
+      'Student';
+    const subtitle = session.slot?.title || session.sport || 'Coaching Session';
+    const rawDate = session.slot?.date || session.date || '';
+    const rawTime = session.slot?.startTime || session.time || '';
     const status = session.status || 'requested';
 
     let uiStatus = status;
@@ -69,12 +75,13 @@ export default function CoachActivityScreen() {
     return {
       id,
       name: studentName,
-      subtitle: `${subtitle} • ${session.credits ? session.credits + ' Credits' : (session.amountInr ? '₹' + session.amountInr : '')}`,
+      subtitle: `${subtitle} • ${session.credits ? session.credits + ' Credits' : (session.amountInr ? '₹' + session.amountInr : (session.slot?.pricePerPerson ? '₹' + session.slot.pricePerPerson : ''))}`,
       date: formatSessionDate(rawDate),
       time: formatSessionTime(rawTime),
+      rawDate,
       status: uiStatus,
       rawStatus: status,
-      location: session.location || '',
+      location: session.slot?.location || session.location || '',
       startedLate: session.startedLate || false,
       delayStatus: session.delayStatus || '',
       delayMinutes: session.delayMinutes || 0,
@@ -85,21 +92,35 @@ export default function CoachActivityScreen() {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const currentBookings = allSessions.filter((s: any) => {
-    const isToday = s.date && s.date.includes(todayStr);
-    const isActive = s.status === 'accepted' || s.status === 'confirmed';
-    return isActive && isToday;
-  }).map(mapSessionToUI);
+  const dedupe = (list: any[]) => {
+    const seenIds = new Set();
+    const seenSlots = new Set();
+    return list.filter(item => {
+      const slotKey = `${item.name}_${item.date}_${item.time}`;
+      if (seenIds.has(item.id) || (item.date && item.time && seenSlots.has(slotKey))) return false;
+      seenIds.add(item.id);
+      if (item.date && item.time) seenSlots.add(slotKey);
+      return true;
+    });
+  };
 
-  const coachBookings = allSessions.filter((s: any) => {
-    const isToday = s.date && s.date.includes(todayStr);
+  const currentBookings = dedupe(allSessions.filter((s: any) => {
+    const sDate = s.slot?.date || s.date || '';
+    const isToday = sDate && sDate.includes(todayStr);
+    const isActive = s.status === 'accepted' || s.status === 'confirmed' || s.status === 'ongoing';
+    return isActive && isToday;
+  }).map(mapSessionToUI));
+
+  const coachBookings = dedupe(allSessions.filter((s: any) => {
+    const sDate = s.slot?.date || s.date || '';
+    const isToday = sDate && sDate.includes(todayStr);
     const isActive = s.status === 'accepted' || s.status === 'confirmed' || s.status === 'requested';
     return isActive && !isToday;
-  }).map(mapSessionToUI);
+  }).map(mapSessionToUI));
 
-  const coachCompleted = allSessions.filter((s: any) => {
+  const coachCompleted = dedupe(allSessions.filter((s: any) => {
     return s.status === 'completed' || s.status === 'cancelled' || s.status === 'no_show';
-  }).map(mapSessionToUI);
+  }).map(mapSessionToUI));
 
   const displayBookings = activeTab === 'current' ? currentBookings : activeTab === 'upcoming' ? coachBookings : coachCompleted;
 

@@ -62,34 +62,46 @@ export default function RegisterScreen() {
   const [referralCode, setReferralCode] = useState('');
   const [showReferralInput, setShowReferralInput] = useState(false);
 
-  const sanitizeErrorMessage = (errorMsg: string): string => {
-    if (!errorMsg) return 'An unexpected error occurred. Please try again.';
-    let message = errorMsg;
-    if (message.includes('auth/invalid-email') || message.includes('invalid-email')) {
-      return 'The email address is invalid. Please enter a correct email.';
+  const sanitizeErrorMessage = (err: any): string => {
+    let message = '';
+    if (err && typeof err === 'object') {
+      if (err.response?.data) {
+        const data = err.response.data;
+        message = typeof data.message === 'string' ? data.message : 
+                  (Array.isArray(data.message) ? data.message[0] : 
+                  (data.error || ''));
+      }
+      if (!message) {
+        message = err.message || '';
+      }
+    } else if (typeof err === 'string') {
+      message = err;
     }
-    if (message.includes('auth/user-not-found') || message.includes('user-not-found') || message.includes('auth/invalid-credential')) {
-      return 'Invalid email or password. Please check your credentials or register first.';
+
+    if (!message) return 'An unexpected error occurred. Please try again.';
+
+    if (message.toLowerCase().includes('already registered') || 
+        message.toLowerCase().includes('already in use') || 
+        message.toLowerCase().includes('already exists') || 
+        message.toLowerCase().includes('email_exists') || 
+        message.toLowerCase().includes('email-already-in-use') ||
+        message.toLowerCase().includes('phone number already exists') ||
+        message.toLowerCase().includes('duplicate key')) {
+      return 'An account with this email address or phone number already exists.';
     }
-    if (message.includes('auth/wrong-password') || message.includes('wrong-password')) {
-      return 'Incorrect password. Please try again.';
+    if (message.toLowerCase().includes('auth/invalid-email') || message.toLowerCase().includes('invalid-email') || message.toLowerCase().includes('email must be a valid email')) {
+      return 'Please enter a valid email address.';
     }
-    if (message.includes('auth/email-already-in-use') || message.includes('email-already-in-use')) {
-      return 'This email address is already in use by another account.';
-    }
-    if (message.includes('auth/weak-password') || message.includes('weak-password')) {
+    if (message.includes('auth/weak-password') || message.includes('weak-password') || message.toLowerCase().includes('password is too weak')) {
       return 'The password is too weak. Please use a stronger password.';
     }
     if (message.includes('auth/network-request-failed')) {
-      return 'Network error. Please check your internet connection and try again.';
+      return 'Network error. Please check your internet connection.';
     }
-    if (message.includes('auth/too-many-requests')) {
-      return 'Too many login attempts. Please try again later or reset your password.';
-    }
-    message = message.replace(/^Firebase:\s*/i, '');
-    message = message.replace(/^Error:\s*/i, '');
-    message = message.replace(/\(auth\/[^)]+\)\.?/g, '');
-    return message.trim();
+    let clean = message.replace(/^Firebase:\s*/i, '');
+    clean = clean.replace(/^Error:\s*/i, '');
+    clean = clean.replace(/\(auth\/[^)]+\)\.?/g, '');
+    return clean.trim();
   };
   
   const [isFirebaseLoading, setIsFirebaseLoading] = useState(false);
@@ -134,7 +146,7 @@ export default function RegisterScreen() {
       startEmailVerification();
     },
     onError: (error: any) => {
-      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Pre-registration check failed'));
+      setScreenError(sanitizeErrorMessage(error));
     }
   });
 
@@ -217,8 +229,13 @@ export default function RegisterScreen() {
 
   const directRegisterMutation = useMutation({
     mutationFn: async () => {
+      const nameParts = name.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '.';
+      
       const payload = {
-        firstName: name,
+        firstName,
+        lastName,
         email,
         phone,
         password,
@@ -254,7 +271,7 @@ export default function RegisterScreen() {
       }
     },
     onError: (error: any) => {
-      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Failed to register account'));
+      setScreenError(sanitizeErrorMessage(error));
     }
   });
 
@@ -369,7 +386,7 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
 
         <View className="px-6 py-4 z-10">
           <TouchableOpacity onPress={() => {
@@ -385,7 +402,12 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          className="flex-1 px-6 pt-4" 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
+        >
           
           {screenError && (
             <View className="mb-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
@@ -447,10 +469,16 @@ export default function RegisterScreen() {
           ) : (
             <View className="mb-8 items-center">
               <Typography variant="h1" color="secondary" className="mb-2 font-bold text-center font-outfit-bold">
-                Create Account
+                {role === 'parent' ? 'Parent Registration' : (role === 'individual' ? 'Athlete Registration' : 'Create Account')}
               </Typography>
               <Typography variant="body1" color="muted" className="text-center font-outfit">
-                {registrationPhase === 'input' && "Get started by filling out your details below."}
+                {registrationPhase === 'input' && (
+                  role === 'parent' 
+                    ? 'Create an account to manage child profiles and book training sessions.'
+                    : (role === 'individual'
+                      ? 'Create an account to track your progress and book expert coaching.'
+                      : 'Get started by filling out your details below.')
+                )}
                 {registrationPhase === 'email-verify' && "Verify your Email Address"}
                 {registrationPhase === 'phone-verify' && "Verify your Phone Number"}
               </Typography>

@@ -29,6 +29,13 @@ export default function FindCoachScreen() {
   const [activeFilter, setActiveFilter] = useState(sport || 'All');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Sync activeFilter if sport param changes
+  React.useEffect(() => {
+    if (sport) {
+      setActiveFilter(sport);
+    }
+  }, [sport]);
+
   const filters = ['All', 'Badminton', 'Tennis', 'Football', 'Swimming', 'Yoga', 'Fitness'];
 
   // Query coaches list

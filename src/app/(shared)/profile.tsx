@@ -72,7 +72,7 @@ export default function ProfileScreen() {
   }, [profile]);
 
   const displayProfile = {
-    name: user?.role === 'coach' ? (profile?.name || user?.name || 'Coach Name') : (user?.name || 'User Profile'),
+    name: user?.role === 'coach' ? (profile?.name || user?.name || 'Coach Name') : (user?.name || (user?.role === 'parent' ? 'Parent Profile' : 'Player Profile')),
     email: user?.role === 'coach' ? (profile?.email || user?.email || 'N/A') : (user?.email || 'N/A'),
     phone: user?.role === 'coach' ? (profile?.phone || profile?.phoneNumber || user?.phone || '') : (user?.phone || ''),
     location: user?.role === 'coach' ? (profile?.profile?.address?.city || user?.location || 'N/A') : (user?.location || 'N/A'),
@@ -92,38 +92,51 @@ export default function ProfileScreen() {
 
   const updateProfileMutation = useMutation({
     mutationFn: async (updatedData: any) => {
-      const res = await api.put('/coaches/my/profile', updatedData);
+      const endpoint = user?.role === 'coach' ? '/coaches/my/profile' : '/users/me';
+      const res = await api.put(endpoint, updatedData);
       return res.data;
     },
     onSuccess: (data, variables) => {
       setIsSaving(false);
-      queryClient.setQueryData(['coachProfile'], (oldData: any) => {
+      const queryKey = user?.role === 'coach' ? ['coachProfile'] : ['myProfile'];
+      queryClient.setQueryData(queryKey, (oldData: any) => {
         if (!oldData) return data?.data || data;
         const updatedUser = data?.data || data;
         
-        return {
-          ...oldData,
-          ...updatedUser,
-          profile: {
-            ...oldData.profile,
-            ...(updatedUser.profile || {}),
-            sports: variables.sports !== undefined ? variables.sports : oldData.profile?.sports,
-            experience: variables.experience !== undefined ? variables.experience : oldData.profile?.experience,
-            bio: variables.bio !== undefined ? variables.bio : oldData.profile?.bio,
-            description: variables.description !== undefined ? variables.description : oldData.profile?.description,
-            address: variables.address !== undefined ? variables.address : oldData.profile?.address,
-            avatar: variables.avatar !== undefined ? variables.avatar : oldData.profile?.avatar,
-          }
-        };
+        if (user?.role === 'coach') {
+          return {
+            ...oldData,
+            ...updatedUser,
+            profile: {
+              ...oldData.profile,
+              ...(updatedUser.profile || {}),
+              sports: variables.sports !== undefined ? variables.sports : oldData.profile?.sports,
+              experience: variables.experience !== undefined ? variables.experience : oldData.profile?.experience,
+              bio: variables.bio !== undefined ? variables.bio : oldData.profile?.bio,
+              description: variables.description !== undefined ? variables.description : oldData.profile?.description,
+              address: variables.address !== undefined ? variables.address : oldData.profile?.address,
+              avatar: variables.avatar !== undefined ? variables.avatar : oldData.profile?.avatar,
+            }
+          };
+        } else {
+          return {
+            ...oldData,
+            ...updatedUser
+          };
+        }
       });
 
-      queryClient.invalidateQueries({ queryKey: ['coachProfile'] });
+      queryClient.invalidateQueries({ queryKey });
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
       if (user) {
+        const resolvedName = user?.role === 'coach' ? name : 
+                             (data?.data?.firstName || data?.firstName ? `${data.data?.firstName || data.firstName} ${data.data?.lastName || data.lastName}`.trim() : name);
         setUser({
           ...user,
-          name: name,
+          name: resolvedName,
+          email: data?.data?.email || data?.email || user.email,
+          phone: data?.data?.phone || data?.phone || user.phone,
           avatar: variables.avatar || user.avatar,
         });
       }
@@ -248,25 +261,29 @@ export default function ProfileScreen() {
 
       updateProfileMutation.mutate(payload);
     } else {
-      if (user) {
-        setUser({
-          ...user,
-          name,
-          experience,
-          location,
-          description,
-          idProof,
-          avatar: uploadedAvatarUrl || avatarUri || user.avatar,
-        });
-        setIsSaving(false);
-        setIsEditing(false);
-        Alert.alert('Success', 'Profile updated successfully!');
+      const nameParts = name.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '.';
+      
+      const payload: any = {
+        firstName,
+        lastName,
+        email: user?.email || '',
+        phone,
+        address: location,
+        role: user?.role === 'parent' ? 'parent' : 'user'
+      };
+
+      if (uploadedAvatarUrl || avatarUri) {
+        payload.avatar = uploadedAvatarUrl || avatarUri;
       }
+
+      updateProfileMutation.mutate(payload);
     }
   };
 
   const standardMenuItems = [
-    { id: 'family', title: 'My Family Tree', icon: 'people-outline', route: user?.role === 'parent' ? '/(parent)/(parent-tabs)/family-tree' : null },
+    ...(user?.role === 'parent' ? [{ id: 'family', title: 'My Family Tree', icon: 'people-outline', route: '/(parent)/(parent-tabs)/family-tree' }] : []),
     { id: 'referral', title: 'Refer & Share App', icon: 'share-social-outline', route: null },
     { id: 'settings', title: 'Settings & Preferences', icon: 'settings-outline', route: '/settings' },
     { id: 'logout', title: 'Sign Out', icon: 'log-out-outline', route: '/(auth)' },
@@ -442,9 +459,6 @@ export default function ProfileScreen() {
 
               {/* Header Profile Summary Panel */}
               <View className="bg-secondary rounded-3xl p-6 mb-6 shadow-md relative overflow-hidden">
-                <View className="absolute right-0 top-0 opacity-10">
-                  <Ionicons name="person" size={180} color="white" />
-                </View>
 
                 <View className="flex-row items-center">
                   <TouchableOpacity 
@@ -466,7 +480,11 @@ export default function ProfileScreen() {
                     </Typography>
 
                     <Typography variant="caption" color="light" className="opacity-80 mt-1 font-outfit uppercase tracking-wider">
-                      {user?.role === 'coach' ? 'Certified Coach' : 'Registered Parent/Player'}
+                      {user?.role === 'coach' 
+                        ? 'Certified Coach' 
+                        : (user?.role === 'parent' 
+                          ? 'Parent' 
+                          : 'Player')}
                     </Typography>
 
                     <View className="flex-row items-center mt-2">

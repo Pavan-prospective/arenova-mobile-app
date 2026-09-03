@@ -20,14 +20,34 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [screenError, setScreenError] = useState<string | null>(null);
 
-  const sanitizeErrorMessage = (errorMsg: string): string => {
-    if (!errorMsg) return 'An unexpected error occurred. Please try again.';
-    let message = errorMsg;
-    if (message.includes('auth/invalid-email') || message.includes('invalid-email')) {
-      return 'The email address is invalid. Please enter a correct email.';
+  const sanitizeErrorMessage = (err: any): string => {
+    let message = '';
+    if (err && typeof err === 'object') {
+      if (err.response?.data) {
+        const data = err.response.data;
+        message = typeof data.message === 'string' ? data.message : 
+                  (Array.isArray(data.message) ? data.message[0] : 
+                  (data.error || ''));
+      }
+      if (!message) {
+        message = err.message || '';
+      }
+    } else if (typeof err === 'string') {
+      message = err;
     }
-    if (message.includes('auth/user-not-found') || message.includes('user-not-found') || message.includes('auth/invalid-credential')) {
-      return 'Invalid email or password. Please check your credentials or register first.';
+
+    if (!message) return 'An unexpected error occurred. Please try again.';
+
+    if (message.toLowerCase().includes('auth/invalid-credential') || 
+        message.toLowerCase().includes('auth/user-not-found') || 
+        message.toLowerCase().includes('invalid credential') || 
+        message.toLowerCase().includes('user-not-found') ||
+        message.toLowerCase().includes('incorrect') ||
+        message.toLowerCase().includes('invalid email or password')) {
+      return 'Incorrect email or password. Please verify your credentials and try again.';
+    }
+    if (message.toLowerCase().includes('auth/invalid-email') || message.toLowerCase().includes('invalid-email')) {
+      return 'The email address is invalid. Please enter a correct email.';
     }
     if (message.includes('auth/wrong-password') || message.includes('wrong-password')) {
       return 'Incorrect password. Please try again.';
@@ -42,12 +62,12 @@ export default function LoginScreen() {
       return 'Network error. Please check your internet connection and try again.';
     }
     if (message.includes('auth/too-many-requests')) {
-      return 'Too many login attempts. Please try again later or reset your password.';
+      return 'Too many login attempts. Please try again later.';
     }
-    message = message.replace(/^Firebase:\s*/i, '');
-    message = message.replace(/^Error:\s*/i, '');
-    message = message.replace(/\(auth\/[^)]+\)\.?/g, '');
-    return message.trim();
+    let clean = message.replace(/^Firebase:\s*/i, '');
+    clean = clean.replace(/^Error:\s*/i, '');
+    clean = clean.replace(/\(auth\/[^)]+\)\.?/g, '');
+    return clean.trim();
   };
   
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +100,7 @@ export default function LoginScreen() {
     },
     onError: (error: any) => {
       setIsLoading(false);
-      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Verification failed'));
+      setScreenError(sanitizeErrorMessage(error));
     }
   });
 
@@ -125,7 +145,7 @@ export default function LoginScreen() {
     },
     onError: (error: any) => {
       setIsLoading(false);
-      setScreenError(sanitizeErrorMessage(error?.response?.data?.message || 'Verification failed'));
+      setScreenError(sanitizeErrorMessage(error));
     }
   });
 
@@ -199,7 +219,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
         <View className="px-6 py-4 z-10">
@@ -214,14 +234,23 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          className="flex-1 px-6 pt-4" 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
+        >
           
           <View className="mb-10 items-center">
             <Typography variant="h1" color="secondary" className="mb-2 font-bold text-center font-outfit-bold">
-              Login to Arenova
+              {role === 'parent' ? 'Parent Portal Login' : (role === 'individual' ? 'Athlete Login' : 'Login to Arenova')}
             </Typography>
             <Typography variant="body1" color="muted" className="text-center font-outfit">
-              {authMode === 'phone' ? 'Enter your mobile number to receive a one-time OTP.' : 'Enter your email and password to login.'}
+              {role === 'parent' 
+                ? 'Access child profiles and manage session bookings.' 
+                : (role === 'individual' 
+                  ? 'Track your training progress and book coach sessions.' 
+                  : 'Enter your email and password to login.')}
             </Typography>
           </View>
 

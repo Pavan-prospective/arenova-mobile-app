@@ -74,6 +74,20 @@ export default function ScheduleScreen() {
     return `${y}-${m}-${d}`;
   };
 
+  const formatDisplayDates = (start: string, end: string) => {
+    if (!start) return 'Select Dates';
+    const formatDate = (dateStr: string) => {
+      const parts = dateStr.split('-');
+      if (parts.length < 3) return dateStr;
+      const [, month, day] = parts;
+      return `${month}/${day}`;
+    };
+    if (end && start !== end) {
+      return `${formatDate(start)} - ${formatDate(end)}`;
+    }
+    return formatDate(start);
+  };
+
   const formatTime24 = (date: Date) => {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -186,7 +200,34 @@ export default function ScheduleScreen() {
       setSubmitError(null);
     },
     onError: (error: any) => {
-      setSubmitError(error?.response?.data?.message || error.message || 'Failed to save slot');
+      let serverMessage = '';
+      if (error?.response?.data) {
+        const data = error.response.data;
+        serverMessage = typeof data.message === 'string' ? data.message : 
+                        (Array.isArray(data.message) ? data.message[0] : 
+                        (data.error || ''));
+      }
+      if (!serverMessage) {
+        serverMessage = error.message || '';
+      }
+
+      const isConflict = error?.response?.status === 409 || 
+                         error?.response?.status === 400 || 
+                         serverMessage.toLowerCase().includes('conflict') || 
+                         serverMessage.toLowerCase().includes('already') ||
+                         serverMessage.toLowerCase().includes('overlap') ||
+                         serverMessage.toLowerCase().includes('has');
+
+      if (isConflict) {
+        setFormErrors(prev => ({
+          ...prev,
+          dates: "The same dates and same time is already confirmed in another slot so do check that.",
+          times: "Please choose a different date or time."
+        }));
+        setSubmitError(null);
+      } else {
+        setSubmitError(serverMessage || 'Failed to save slot');
+      }
     }
   });
 
@@ -461,11 +502,16 @@ export default function ScheduleScreen() {
         onRequestClose={() => setIsModalVisible(false)}
       >
         <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
           className="flex-1 justify-end bg-black/50"
         >
           <View className="bg-white rounded-t-3xl p-6 shadow-xl max-h-[85%]">
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView 
+              showsVerticalScrollIndicator={false} 
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 60 }}
+            >
               <View className="flex-row justify-between items-center mb-6">
                 <Typography variant="h2" color="secondary" className="font-outfit-bold">{editingSlotId ? 'Edit Slot' : 'Add New Slot'}</Typography>
                 <TouchableOpacity onPress={() => setIsModalVisible(false)}>
@@ -580,7 +626,7 @@ export default function ScheduleScreen() {
                       }`}
                     >
                       <Typography color="secondary" numberOfLines={1} className="font-outfit text-sm">
-                        {startDate ? (endDate ? `${startDate} to ${endDate}` : startDate) : 'Select Dates'}
+                        {formatDisplayDates(startDate, endDate)}
                       </Typography>
                       <Ionicons name="calendar-outline" size={20} color="#0F2C59" />
                     </TouchableOpacity>

@@ -3,15 +3,24 @@ import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useMutation } from '@tanstack/react-query';
+import { api } from '@/services/api';
 
 export default function ReviewPlayerScreen() {
   const router = useRouter();
+  const { bookingId, coachName, dateDisplay, sport: initialSport } = useLocalSearchParams<{
+    bookingId?: string;
+    coachName?: string;
+    dateDisplay?: string;
+    sport?: string;
+  }>();
 
   const [rating, setRating] = useState(0);
-  const [sport, setSport] = useState('Badminton');
+  const [sport, setSport] = useState(initialSport || 'Badminton');
   const [description, setDescription] = useState('');
   const [selectedFeedbacks, setSelectedFeedbacks] = useState<string[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const sportsOptions = ['Badminton', 'Tennis', 'Football', 'Swimming', 'Yoga'];
   const feedbackOptions = ['Friendly', 'Professional', 'Wonderful', 'Great'];
@@ -24,8 +33,30 @@ export default function ReviewPlayerScreen() {
     }
   };
 
+  const submitReviewMutation = useMutation({
+    mutationFn: async (payload: { bookingId: string; rating: number; text: string; tags: string[] }) => {
+      const res = await api.post('/reviews', payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      router.replace('/review-success');
+    },
+    onError: (err: any) => {
+      setSubmitError(err?.response?.data?.message || err.message || 'Failed to submit review');
+    }
+  });
+
   const handleSendFeedback = () => {
-    router.replace('/review-success');
+    if (!bookingId) {
+      router.replace('/review-success');
+      return;
+    }
+    submitReviewMutation.mutate({
+      bookingId,
+      rating,
+      text: description,
+      tags: selectedFeedbacks.map(fb => fb.toLowerCase())
+    });
   };
 
   return (
@@ -45,10 +76,12 @@ export default function ReviewPlayerScreen() {
           
           <View className="items-center mb-8">
             <View className="w-20 h-20 rounded-full bg-[#F5CEAA] items-center justify-center mb-3">
-              <Typography variant="h2" color="primary" weight="bold">JC</Typography>
+              <Typography variant="h2" color="primary" weight="bold">
+                {coachName?.substring(0, 2).toUpperCase() || 'CO'}
+              </Typography>
             </View>
-            <Typography variant="h3" color="secondary" weight="bold">Jane Cooper</Typography>
-            <Typography variant="body2" color="muted">Group Session • 24 March</Typography>
+            <Typography variant="h3" color="secondary" weight="bold">{coachName || 'Coach Review'}</Typography>
+            <Typography variant="body2" color="muted">{dateDisplay || 'Training Session'}</Typography>
           </View>
 
           {/* Rating */}
@@ -115,10 +148,17 @@ export default function ReviewPlayerScreen() {
             className="bg-white border-0 shadow-sm mb-6"
           />
 
+          {submitError && (
+            <Typography variant="caption" color="error" className="mb-4 text-center font-outfit">
+              {submitError}
+            </Typography>
+          )}
+
           <Button 
             title="Send Feedback" 
             onPress={handleSendFeedback} 
-            disabled={rating === 0}
+            disabled={rating === 0 || submitReviewMutation.isPending}
+            isLoading={submitReviewMutation.isPending}
             className="mb-8"
           />
 

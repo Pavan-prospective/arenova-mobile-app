@@ -61,8 +61,14 @@ export default function CoachDashboard() {
   const avgRating = metrics?.averageRating ?? 0;
 
   const mapSessionToUI = (session: any) => {
-    const studentName = session.student?.name || session.user?.name || session.studentName || 'Student';
-    const sportName = session.sport || session.title || 'Coaching';
+    const studentName = 
+      session.bookedBy?.name || 
+      session.participant?.name || 
+      session.student?.name || 
+      session.user?.name || 
+      session.studentName || 
+      'Student';
+    const sportName = session.slot?.title || session.sport || session.title || 'Coaching';
     
     const formatTime12 = (timeStr: string) => {
       if (!timeStr) return '';
@@ -82,21 +88,36 @@ export default function CoachDashboard() {
       return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
+    const rawTime = session.slot?.startTime || session.startTime || session.time || '';
+    const rawDate = session.slot?.date || session.date || session.startDate || '';
+
     return {
       id: session._id || session.id || Math.random().toString(),
       name: studentName,
       sport: sportName,
       startedAt: session.startedAt ? formatTime12(session.startedAt) : undefined,
-      time: session.startTime ? formatTime12(session.startTime) : (session.time ? formatTime12(session.time) : ''),
-      date: session.date ? formatDateShort(session.date) : (session.startDate ? formatDateShort(session.startDate) : ''),
+      time: formatTime12(rawTime),
+      date: formatDateShort(rawDate),
       delayStatus: session.delayStatus,
       delayMinutes: session.delayMinutes
     };
   };
 
-  const currentSessionsList = (dashboardData?.data?.activeSessions || []).map(mapSessionToUI);
-  const upcomingSessionsList = (dashboardData?.data?.upcomingSessions || []).map(mapSessionToUI);
-  const completedSessionsList = (segmentedSessions?.data?.completed || []).map(mapSessionToUI);
+  const dedupe = (list: any[]) => {
+    const seenIds = new Set();
+    const seenSlots = new Set();
+    return list.filter(item => {
+      const slotKey = `${item.name}_${item.date}_${item.time}`;
+      if (seenIds.has(item.id) || (item.date && item.time && seenSlots.has(slotKey))) return false;
+      seenIds.add(item.id);
+      if (item.date && item.time) seenSlots.add(slotKey);
+      return true;
+    });
+  };
+
+  const currentSessionsList = dedupe((dashboardData?.data?.activeSessions || []).map(mapSessionToUI));
+  const upcomingSessionsList = dedupe((dashboardData?.data?.upcomingSessions || []).map(mapSessionToUI));
+  const completedSessionsList = dedupe((segmentedSessions?.data?.completed || []).map(mapSessionToUI));
 
   const learningTips = [
     {

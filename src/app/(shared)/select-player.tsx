@@ -10,135 +10,244 @@ import { api } from '@/services/api';
 
 export default function SelectPlayerScreen() {
   const router = useRouter();
-  const searchParams = useLocalSearchParams();
-  const { user } = useAuthStore();
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const searchParams = useLocalSearchParams<{
+    slotId?: string;
+    coachId?: string;
+    coachName?: string;
+    coachSport?: string;
+    date?: string;
+    time?: string;
+    price?: string;
+  }>();
+  const { user, children: storedChildren } = useAuthStore();
 
-  const isParent = user?.role === 'parent';
-
-  // Fetch children list if user is a parent
+  // Fetch children list from API
   const { data: childrenResponse, isLoading } = useQuery({
     queryKey: ['children'],
     queryFn: async () => {
       const res = await api.get('/users/me/children');
       return res.data;
-    },
-    enabled: isParent
+    }
   });
 
-  const children = childrenResponse?.data || [];
+  const rawChildren = childrenResponse?.data || childrenResponse?.children || (Array.isArray(childrenResponse) ? childrenResponse : []);
+  const serverChildren = Array.isArray(rawChildren) ? rawChildren : [];
 
-  const players = [
-    { id: 'self', name: 'Myself', role: 'Account Owner', color: 'bg-blue-100' }
+  // Merge server and local store so newly added children are always visible immediately
+  const childrenMap = new Map<string, any>();
+  (storedChildren || []).forEach(c => childrenMap.set(c._id || c.name, c));
+  serverChildren.forEach(c => childrenMap.set(c._id || c.name, c));
+  const children = Array.from(childrenMap.values());
+
+  const players: { id: string; name: string; role: string; color: string; isChild: boolean }[] = [
+    { id: 'self', name: user?.name || 'Myself (Account Owner)', role: 'Account Owner', color: 'bg-blue-100', isChild: false }
   ];
 
-  if (isParent && children.length > 0) {
+  // Always show all available children in the list
+  if (children.length > 0) {
     children.forEach((child: any) => {
       players.push({
         id: child._id || child.id,
         name: child.name,
-        role: `Child (${child.sport || 'Sports'})`,
-        color: 'bg-emerald-100'
+        role: `Child (${child.sport || searchParams.coachSport || 'Sports'})`,
+        color: 'bg-emerald-100',
+        isChild: true
       });
     });
   }
 
+  // Selected player IDs (supports single or multiple attendees)
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>(() => {
+    if (children.length > 0) {
+      return [children[0]._id || children[0].id];
+    }
+    return ['self'];
+  });
+
+  // Keep selection updated when children load
+  React.useEffect(() => {
+    if (children.length > 0 && (selectedPlayerIds.length === 0 || (selectedPlayerIds.length === 1 && selectedPlayerIds[0] === 'self'))) {
+      setSelectedPlayerIds([children[0]._id || children[0].id]);
+    }
+  }, [children.length]);
+
+  const togglePlayer = (id: string) => {
+    setSelectedPlayerIds(prev => {
+      if (prev.includes(id)) {
+        // Keep at least one attendee if possible
+        const next = prev.filter(p => p !== id);
+        return next;
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // Pricing calculations
+  const perPersonFee = Number(searchParams.price || 400);
+  const attendeeCount = selectedPlayerIds.length;
+  const subtotal = attendeeCount * perPersonFee;
+  const platformFee = 50;
+  const totalAmount = subtotal > 0 ? subtotal + platformFee : 0;
+
   const handleContinue = () => {
-    if (!selectedPlayerId) {
-      Alert.alert('Error', 'Please select a player for this booking.');
+    if (selectedPlayerIds.length === 0) {
+      Alert.alert('Selection Required', 'Please select at least one attendee (Myself or Child).');
       return;
     }
-    
-    // Determine target params
-    const childId = selectedPlayerId !== 'self' ? selectedPlayerId : undefined;
-    const selectedPlayer = players.find(p => p.id === selectedPlayerId);
-    
+
+    const selectedPlayers = players.filter(p => selectedPlayerIds.includes(p.id));
+    const firstChild = selectedPlayers.find(p => p.isChild);
+    const attendeeNames = selectedPlayers.map(p => p.name).join(', ');
+
     router.push({
       pathname: '/(shared)/session-summary',
       params: {
         ...searchParams,
-        childId: childId || '',
-        studentName: selectedPlayer?.name || ''
+        childId: firstChild ? firstChild.id : '',
+        studentName: attendeeNames,
+        attendeeCount: attendeeCount.toString(),
+        sessionFee: subtotal.toString(),
+        platformFee: platformFee.toString(),
+        totalAmount: totalAmount.toString(),
+        price: subtotal.toString()
       }
     });
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-100 shadow-sm z-10">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+      <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', zIndex: 10 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginLeft: -8 }}>
           <Ionicons name="arrow-back" size={24} color="#0F2C59" />
         </TouchableOpacity>
         <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold">
-          Who is Playing?
+          Select Attendee(s)
         </Typography>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6 pb-24">
-        <Typography variant="subtitle1" color="secondary" weight="bold" className="mb-4 font-outfit-bold">
-          Select Player Profile
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 16, paddingTop: 20 }} contentContainerStyle={{ paddingBottom: 140 }}>
+        <Typography variant="subtitle1" color="secondary" weight="bold" className="mb-2 font-outfit-bold">
+          Who is attending this session?
+        </Typography>
+        <Typography variant="caption" color="muted" className="mb-4 font-outfit">
+          Select yourself, your child, or multiple children. The session fee is calculated dynamically per attendee.
         </Typography>
 
         {isLoading ? (
-          <View className="py-10 justify-center items-center">
+          <View style={{ paddingVertical: 40, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="small" color="#FF5100" />
           </View>
         ) : (
-          players.map(player => (
-            <TouchableOpacity 
-              key={player.id}
-              onPress={() => setSelectedPlayerId(player.id)}
-              activeOpacity={0.8}
-              className={`bg-white rounded-2xl p-4 mb-4 shadow-sm border-2 transition-all ${
-                selectedPlayerId === player.id ? 'border-primary' : 'border-transparent'
-              }`}
-            >
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center">
-                  <View className={`w-12 h-12 rounded-full ${player.color} items-center justify-center mr-4 shadow-sm`}>
-                    <Typography variant="subtitle1" color="primary" weight="bold" className="font-outfit-bold">
-                      {player.name.substring(0, 2).toUpperCase()}
-                    </Typography>
+          players.map(player => {
+            const isSelected = selectedPlayerIds.includes(player.id);
+            return (
+              <TouchableOpacity 
+                key={player.id}
+                onPress={() => togglePlayer(player.id)}
+                activeOpacity={0.8}
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 12,
+                  borderWidth: 2,
+                  borderColor: isSelected ? '#FF5100' : 'transparent'
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: player.isChild ? '#D1FAE5' : '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                      <Typography variant="subtitle1" color="primary" weight="bold" className="font-outfit-bold">
+                        {player.name.substring(0, 2).toUpperCase()}
+                      </Typography>
+                    </View>
+                    <View>
+                      <Typography variant="subtitle1" color="secondary" weight="bold" className="font-outfit-bold">
+                        {player.name}
+                      </Typography>
+                      <Typography variant="caption" color="muted" className="font-outfit">
+                        {player.role} • ₹{perPersonFee}
+                      </Typography>
+                    </View>
                   </View>
-                  <View>
-                    <Typography variant="subtitle1" color="secondary" weight="bold" className="font-outfit-bold">
-                      {player.name}
-                    </Typography>
-                    <Typography variant="caption" color="muted" className="font-outfit">
-                      {player.role}
-                    </Typography>
+                  <View style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    borderWidth: 2,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderColor: isSelected ? '#FF5100' : '#D1D5DB',
+                    backgroundColor: isSelected ? '#FF5100' : 'transparent'
+                  }}>
+                    {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
                   </View>
                 </View>
-                <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedPlayerId === player.id ? 'border-primary bg-primary' : 'border-gray-300'}`}>
-                  {selectedPlayerId === player.id && <Ionicons name="checkmark" size={14} color="white" />}
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            );
+          })
         )}
 
-        {isParent && (
-          <TouchableOpacity 
-            className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-dashed border-gray-300 flex-row items-center justify-center"
-            onPress={() => router.push('/(parent)/family/add-child')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#FF5100" className="mr-2" />
-            <Typography variant="subtitle2" color="primary" weight="bold" className="font-outfit-bold">
-              Add New Child
+        <TouchableOpacity 
+          style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#d1d5db', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+          onPress={() => router.push({
+            pathname: '/(parent)/family/add-child',
+            params: {
+              ...searchParams,
+              coachSport: searchParams.coachSport || ''
+            }
+          })}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add-circle-outline" size={24} color="#FF5100" style={{ marginRight: 8 }} />
+          <Typography variant="subtitle2" color="primary" weight="bold" className="font-outfit-bold">
+            Add Another Child / Attendee
+          </Typography>
+        </TouchableOpacity>
+
+        {/* Live Calculation Preview Card */}
+        {selectedPlayerIds.length > 0 && (
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginTop: 8, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <Typography variant="subtitle2" color="secondary" weight="bold" className="font-outfit-bold mb-2">
+              Fee Breakdown Preview
             </Typography>
-          </TouchableOpacity>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Typography variant="body2" color="text" className="font-outfit">
+                Coaching Fee ({attendeeCount} attendee{attendeeCount > 1 ? 's' : ''} × ₹{perPersonFee})
+              </Typography>
+              <Typography variant="body2" color="secondary" weight="semibold" className="font-outfit-semibold">
+                ₹{subtotal}
+              </Typography>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Typography variant="body2" color="text" className="font-outfit">
+                Platform Fee
+              </Typography>
+              <Typography variant="body2" color="secondary" weight="semibold" className="font-outfit-semibold">
+                ₹{platformFee}
+              </Typography>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+              <Typography variant="subtitle2" color="secondary" weight="bold" className="font-outfit-bold">
+                Total
+              </Typography>
+              <Typography variant="subtitle2" color="primary" weight="bold" className="font-outfit-bold">
+                ₹{totalAmount}
+              </Typography>
+            </View>
+          </View>
         )}
       </ScrollView>
 
       {/* Sticky Bottom Bar */}
-      <View className="bg-white p-4 shadow-lg border-t border-gray-100 pb-8">
+      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: 32 }}>
         <Button 
-          title="Continue" 
+          title={attendeeCount > 0 ? `Continue (₹${totalAmount})` : "Select Attendee"} 
           onPress={handleContinue}
-          disabled={!selectedPlayerId}
+          disabled={selectedPlayerIds.length === 0}
         />
       </View>
     </SafeAreaView>

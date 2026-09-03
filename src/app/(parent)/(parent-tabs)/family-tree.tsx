@@ -15,8 +15,11 @@ interface Child {
   school?: string;
 }
 
+import { useAuthStore } from '@/store';
+
 export default function FamilyTreeScreen() {
   const router = useRouter();
+  const { children: storedChildren } = useAuthStore();
   const [selectedProfileId, setSelectedProfileId] = useState<string>('self');
 
   // Fetch children list
@@ -28,7 +31,14 @@ export default function FamilyTreeScreen() {
     }
   });
 
-  const children: Child[] = childrenResponse?.data || [];
+  const rawServer = childrenResponse?.data || childrenResponse?.children || (Array.isArray(childrenResponse) ? childrenResponse : []);
+  const serverChildren: Child[] = Array.isArray(rawServer) ? rawServer : [];
+
+  // Merge server children with persistent AuthStore children
+  const childrenMap = new Map<string, Child>();
+  (storedChildren || []).forEach(c => childrenMap.set(c._id || c.name, c));
+  serverChildren.forEach(c => childrenMap.set(c._id || c.name, c));
+  const children: Child[] = Array.from(childrenMap.values());
 
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>

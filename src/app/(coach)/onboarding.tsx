@@ -200,7 +200,7 @@ export default function CoachRegistrationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
         <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-200 shadow-sm z-10">
           <TouchableOpacity 
             onPress={() => {

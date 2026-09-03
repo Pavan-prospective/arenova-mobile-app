@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '../store';
 
 // We'll use a mocked base URL or environment variable later
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://arenova-backend-production-8430.up.railway.app/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://arenova-backend-production-3192.up.railway.app/api';
 
 export const api = axios.create({
   baseURL: BASE_URL,

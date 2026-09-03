@@ -26,26 +26,33 @@ interface CoachProfile {
 }
 
 export default function PublicCoachProfileScreen() {
+  console.log('[DEBUG coach-profile] 1. entering component');
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  console.log('[DEBUG coach-profile] 2. after useRouter');
+  const { id, coachId } = useLocalSearchParams<{ id?: string; coachId?: string }>();
+  const targetCoachId = id || coachId;
+  console.log('[DEBUG coach-profile] 3. targetCoachId:', targetCoachId);
 
   // Fetch coach details
   const { data: coachResponse, isLoading } = useQuery({
-    queryKey: ['coachProfile', id],
+    queryKey: ['coachProfile', targetCoachId],
     queryFn: async () => {
-      if (!id) return null;
-      const res = await api.get(`/coaches/${id}`);
+      console.log('[DEBUG coach-profile] queryFn executing for', targetCoachId);
+      if (!targetCoachId) return null;
+      const res = await api.get(`/coaches/${targetCoachId}`);
       return res.data;
     },
-    enabled: !!id
+    enabled: !!targetCoachId
   });
+  console.log('[DEBUG coach-profile] 4. after useQuery, isLoading:', isLoading);
 
   const coach: CoachProfile | null = coachResponse?.data || null;
 
   if (isLoading) {
+    console.log('[DEBUG coach-profile] 5. returning loading view');
     return (
-      <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-        <View className="flex-1 justify-center items-center">
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }} edges={['top']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color="#FF5100" />
         </View>
       </SafeAreaView>
@@ -54,16 +61,16 @@ export default function PublicCoachProfileScreen() {
 
   if (!coach) {
     return (
-      <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-        <View className="px-4 py-4 flex-row items-center bg-white border-b border-gray-100 shadow-sm z-10">
-          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }} edges={['top']}>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginLeft: -8 }}>
             <Ionicons name="arrow-back" size={24} color="#0F2C59" />
           </TouchableOpacity>
           <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold ml-4">
             Profile Not Found
           </Typography>
         </View>
-        <View className="flex-1 justify-center items-center px-6">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }}>
           <Typography variant="subtitle1" color="secondary" className="mb-4 text-center font-outfit-semibold">
             We couldn't retrieve this coach's profile details.
           </Typography>
@@ -82,10 +89,10 @@ export default function PublicCoachProfileScreen() {
   const bio = coach.bio || "Professional coach with verified experience in training students of all ages. Let's improve your game!";
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-100 shadow-sm z-10">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+      <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', zIndex: 10 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginLeft: -8 }}>
           <Ionicons name="arrow-back" size={24} color="#0F2C59" />
         </TouchableOpacity>
         <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold">
@@ -94,36 +101,36 @@ export default function PublicCoachProfileScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6" contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, paddingHorizontal: 16, paddingTop: 24 }} contentContainerStyle={{ paddingBottom: 120 }}>
         {/* Main Info Card */}
-        <View className="bg-white rounded-2xl p-6 mb-5 shadow-sm items-center border border-gray-50">
-          <View className="w-24 h-24 rounded-full bg-[#F5CEAA] items-center justify-center mb-4 shadow-md">
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 24, marginBottom: 20, alignItems: 'center', borderWidth: 1, borderColor: '#f3f4f6' }}>
+          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#F5CEAA', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <Typography variant="h1" color="primary" weight="bold" className="font-outfit-bold text-[28px]">{coachInitials}</Typography>
           </View>
           <Typography variant="h3" color="secondary" weight="bold" className="font-outfit-bold mb-1">{coachName}</Typography>
           <Typography variant="body1" color="primary" weight="bold" className="mb-3 font-outfit-bold">{coachSport}</Typography>
-          <View className="flex-row items-center bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
-            <Ionicons name="star" size={16} color="#F59E0B" className="mr-1.5" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999, borderWidth: 1, borderColor: '#f3f4f6' }}>
+            <Ionicons name="star" size={16} color="#F59E0B" style={{ marginRight: 6 }} />
             <Typography variant="subtitle2" color="secondary" weight="bold" className="font-outfit-bold">{rating} • {reviews} Reviews</Typography>
           </View>
         </View>
 
         {/* Experience Details */}
-        <View className="flex-row justify-between mb-5 gap-3">
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-50 items-center">
-            <Ionicons name="ribbon-outline" size={24} color="#FF5100" className="mb-1" />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
+          <View style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f3f4f6', alignItems: 'center' }}>
+            <Ionicons name="ribbon-outline" size={24} color="#FF5100" style={{ marginBottom: 4 }} />
             <Typography variant="caption" color="muted" className="font-outfit mb-0.5">Experience</Typography>
             <Typography variant="subtitle2" color="secondary" weight="bold" className="font-outfit-bold">{coach.experience || '3+'} Years</Typography>
           </View>
-          <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm border border-gray-50 items-center">
-            <Ionicons name="location-outline" size={24} color="#FF5100" className="mb-1" />
+          <View style={{ flex: 1, backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#f3f4f6', alignItems: 'center' }}>
+            <Ionicons name="location-outline" size={24} color="#FF5100" style={{ marginBottom: 4 }} />
             <Typography variant="caption" color="muted" className="font-outfit mb-0.5">City</Typography>
             <Typography variant="subtitle2" color="secondary" weight="bold" className="font-outfit-bold">{coach.city || 'Hyderabad'}</Typography>
           </View>
         </View>
 
         {/* About/Bio Section */}
-        <View className="bg-white rounded-2xl p-5 shadow-sm mb-5 border border-gray-50">
+        <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#f3f4f6' }}>
           <Typography variant="subtitle1" color="secondary" weight="bold" className="mb-2 font-outfit-bold">About</Typography>
           <Typography variant="body2" color="text" className="leading-5 font-outfit text-gray-600">
             {bio}
@@ -132,11 +139,11 @@ export default function PublicCoachProfileScreen() {
 
         {/* Specialties/Skills */}
         {specialties.length > 0 && (
-          <View className="bg-white rounded-2xl p-5 shadow-sm mb-5 border border-gray-50">
+          <View style={{ backgroundColor: '#ffffff', borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: '#f3f4f6' }}>
             <Typography variant="subtitle1" color="secondary" weight="bold" className="mb-3 font-outfit-bold">Specialties & Skills</Typography>
-            <View className="flex-row flex-wrap gap-2">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {specialties.map((spec, i) => (
-                <View key={i} className="bg-orange-50 border border-orange-100 rounded-full px-3 py-1">
+                <View key={i} style={{ backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#ffedd5', borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 4 }}>
                   <Typography variant="caption" color="primary" weight="bold" className="font-outfit-bold">{spec}</Typography>
                 </View>
               ))}
@@ -146,12 +153,12 @@ export default function PublicCoachProfileScreen() {
       </ScrollView>
 
       {/* Book Button */}
-      <View className="absolute bottom-0 w-full bg-white p-4 shadow-lg border-t border-gray-100 pb-8 z-20">
+      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: 32, zIndex: 20 }}>
         <Button 
           title="Book Session" 
           onPress={() => router.push({
             pathname: '/(shared)/select-date',
-            params: { coachId: id }
+            params: { coachId: targetCoachId }
           })}
         />
       </View>

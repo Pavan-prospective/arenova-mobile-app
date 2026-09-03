@@ -8,17 +8,23 @@ import { Calendar } from 'react-native-calendars';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
+import { useAuthStore } from '@/store';
+
 interface Slot {
   _id: string;
   id?: string;
   startTime: string;
   endTime: string;
-  status: string;
+  status?: string;
   price?: number;
+  pricePerPerson?: number;
+  capacity?: number;
+  bookedCount?: number;
 }
 
 export default function SelectDateScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const { coachId } = useLocalSearchParams<{ coachId?: string }>();
   
   const [selectedDate, setSelectedDate] = useState('');
@@ -65,14 +71,41 @@ export default function SelectDateScreen() {
       Alert.alert('Error', 'Please select an available time slot');
       return;
     }
+
+    const selectedSlot = slots.find(s => (s._id || s.id) === selectedSlotId);
+    const slotPrice = (selectedSlot?.pricePerPerson ?? selectedSlot?.price ?? 500).toString();
+    const timeFormatted = `${selectedSlot?.startTime} - ${selectedSlot?.endTime}`;
     
-    router.push({
-      pathname: '/(shared)/select-player',
-      params: {
-        coachId: coachId || '',
-        slotId: selectedSlotId
-      }
-    });
+    // If user is a Parent, direct them to select a child profile.
+    // If user is an Individual / Player, skip child selection and proceed directly to Session Summary.
+    if (user?.role === 'parent') {
+      router.push({
+        pathname: '/(shared)/select-player',
+        params: {
+          coachId: coachId || '',
+          slotId: selectedSlotId,
+          date: selectedDate,
+          time: timeFormatted,
+          price: slotPrice,
+          coachName,
+          coachSport
+        }
+      });
+    } else {
+      router.push({
+        pathname: '/(shared)/session-summary',
+        params: {
+          coachId: coachId || '',
+          slotId: selectedSlotId,
+          date: selectedDate,
+          time: timeFormatted,
+          price: slotPrice,
+          coachName,
+          coachSport,
+          studentName: user?.name || 'Myself'
+        }
+      });
+    }
   };
 
   const selectedSlot = slots.find(s => (s._id || s.id) === selectedSlotId);
@@ -168,33 +201,39 @@ export default function SelectDateScreen() {
               <View className="flex-row flex-wrap gap-2 pt-2">
                 {slots.map((slot) => {
                   const isSelected = selectedSlotId === (slot._id || slot.id);
+                  const displayPrice = slot.pricePerPerson ?? slot.price;
+                  const isFull = slot.capacity !== undefined && slot.bookedCount !== undefined && slot.bookedCount >= slot.capacity;
+
                   return (
                     <TouchableOpacity
                       key={slot._id || slot.id}
-                      onPress={() => setSelectedSlotId(slot._id || slot.id || null)}
-                      activeOpacity={0.8}
+                      onPress={() => !isFull && setSelectedSlotId(slot._id || slot.id || null)}
+                      activeOpacity={isFull ? 1 : 0.8}
+                      disabled={isFull}
                       className={`px-4 py-2.5 rounded-xl border-2 transition-all ${
-                        isSelected 
-                          ? 'bg-primary border-primary' 
-                          : 'bg-white border-gray-200'
+                        isFull
+                          ? 'bg-gray-100 border-gray-200 opacity-50'
+                          : isSelected 
+                            ? 'bg-primary border-primary' 
+                            : 'bg-white border-gray-200'
                       }`}
                     >
                       <Typography 
                         variant="body2" 
-                        color={isSelected ? 'white' : 'secondary'} 
+                        color={isFull ? 'muted' : isSelected ? 'white' : 'secondary'} 
                         weight="bold"
                         className="font-outfit-bold"
                       >
                         {slot.startTime}
                       </Typography>
-                      {slot.price && (
+                      {displayPrice !== undefined && (
                         <Typography 
                           variant="caption" 
-                          color={isSelected ? 'white' : 'muted'} 
+                          color={isFull ? 'muted' : isSelected ? 'white' : 'muted'} 
                           align="center"
                           className="mt-0.5 font-outfit text-[9px]"
                         >
-                          ₹{slot.price}
+                          {isFull ? 'Full' : `₹${displayPrice}`}
                         </Typography>
                       )}
                     </TouchableOpacity>

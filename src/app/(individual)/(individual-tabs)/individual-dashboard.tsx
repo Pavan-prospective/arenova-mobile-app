@@ -1,13 +1,26 @@
 import React from 'react';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/store';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/services/api';
 
 export default function IndividualDashboard() {
   const { user } = useAuthStore();
+
+  // Fetch recommended coaches
+  const { data: coachesResponse, isLoading: isLoadingCoaches } = useQuery({
+    queryKey: ['featuredCoaches'],
+    queryFn: async () => {
+      const res = await api.get('/coaches');
+      return res.data;
+    }
+  });
+
+  const coaches = coachesResponse?.data || [];
   return (
     <View className="flex-1 bg-[#EEF3F9]">
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
@@ -76,6 +89,69 @@ export default function IndividualDashboard() {
               Venues
             </Typography>
           </TouchableOpacity>
+        </View>
+
+        {/* Recommended Coaches */}
+        <View className="px-6 pb-12">
+          <View className="flex-row justify-between items-center mb-4">
+            <Typography variant="h3" color="secondary" weight="bold" className="font-outfit-bold">
+              Recommended Coaches
+            </Typography>
+            <TouchableOpacity onPress={() => router.push('/(shared)/search')}>
+              <Typography variant="body2" color="primary" weight="bold" className="font-outfit-bold">
+                See All
+              </Typography>
+            </TouchableOpacity>
+          </View>
+
+          {isLoadingCoaches ? (
+            <ActivityIndicator size="small" color="#FF5100" />
+          ) : coaches.length === 0 ? (
+            <Typography variant="body2" color="muted" className="font-outfit italic text-center py-4">
+              No recommended coaches available.
+            </Typography>
+          ) : (
+            coaches.slice(0, 3).map((coach: any) => {
+              const coachId = coach._id || coach.id;
+              const coachName = coach.name || `${coach.firstName || ''} ${coach.lastName || ''}`.trim() || 'Coach';
+              const coachSport = coach.sport || coach.sports?.[0] || 'Sports';
+              const coachInitials = coachName.split(' ').map((n: string) => n[0]).join('');
+              const rating = coach.rating || '4.8';
+
+              return (
+                <TouchableOpacity 
+                  key={coachId}
+                  onPress={() => router.push({
+                    pathname: '/(shared)/coach-profile',
+                    params: { id: coachId }
+                  })}
+                  activeOpacity={0.8}
+                  className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 flex-row items-center"
+                >
+                  <View className="w-14 h-14 rounded-full bg-[#F5E6D3] mr-4 items-center justify-center shadow-sm">
+                    <Typography variant="subtitle1" color="primary" weight="bold" className="font-outfit-bold">
+                      {coachInitials}
+                    </Typography>
+                  </View>
+                  <View className="flex-1">
+                    <Typography variant="subtitle1" color="secondary" weight="bold" className="font-outfit-bold mb-0.5">
+                      {coachName}
+                    </Typography>
+                    <Typography variant="body2" color="muted" className="font-outfit mb-1">
+                      {coachSport}
+                    </Typography>
+                    <View className="flex-row items-center">
+                      <Ionicons name="star" size={14} color="#FFD700" className="mr-1" />
+                      <Typography variant="caption" color="secondary" weight="bold" className="font-outfit-bold">
+                        {rating}
+                      </Typography>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
 
       </ScrollView>

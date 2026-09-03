@@ -13,14 +13,14 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize auth with memory persistence to silence the warning
+// Initialize auth with memory persistence first to silence the AsyncStorage warning
 let auth: any;
 try {
-  auth = getAuth(app);
-} catch (e) {
   auth = initializeAuth(app, {
     persistence: inMemoryPersistence
   });
+} catch (e) {
+  auth = getAuth(app);
 }
 
 export { auth, app, firebaseConfig };
