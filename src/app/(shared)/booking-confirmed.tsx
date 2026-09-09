@@ -1,12 +1,13 @@
 import React from 'react';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuthStore } from '@/store';
 
 export default function BookingConfirmedScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
   const { 
@@ -37,7 +38,7 @@ export default function BookingConfirmedScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-12 pb-24">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-12" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 40, 60) }}>
         
         {/* Success Header */}
         <View className="items-center mb-10">

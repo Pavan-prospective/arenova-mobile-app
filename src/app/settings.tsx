@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Switch, Share, Platform, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store';
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { soundEnabled, vibrationEnabled, setSoundEnabled, setVibrationEnabled } = useAuthStore();
   const [modalDocType, setModalDocType] = useState<'support' | 'privacy' | 'terms' | null>(null);
@@ -23,7 +24,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       {/* Header */}
       <View className="px-4 py-4 flex-row items-center bg-white border-b border-gray-100 shadow-sm z-10">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2 mr-4">
@@ -32,9 +33,10 @@ export default function SettingsScreen() {
         <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold">
           Settings
         </Typography>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4 pb-12">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 40, 60) }}>
         
         {/* Preferences */}
         <Typography variant="subtitle2" color="muted" weight="bold" className="mb-2 ml-1 uppercase font-outfit-bold">

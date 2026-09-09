@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, ScrollView, TouchableOpacity, Alert, Modal, ActivityIndicator } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { api } from '@/services/api';
+import { api, RAZORPAY_KEY_ID } from '@/services/api';
 import { queryClient } from '@/services/queryClient';
 import { useAuthStore } from '@/store';
 
 export default function PaymentScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Razorpay Modal States
+  const [isRazorpayModalVisible, setIsRazorpayModalVisible] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<{
+    orderId: string;
+    amount: number;
+    keyId: string;
+  } | null>(null);
+  const [isBridgedParent, setIsBridgedParent] = useState(false);
 
   const { 
     slotId, 
@@ -52,15 +63,14 @@ export default function PaymentScreen() {
 
     try {
       // 1. Check if user is parent role. If so, bridge to 'player' on backend
-      // so backend create-order and verify-payment succeed 100% without being blocked
-      // by the server-side profile.children discrepancy.
       const isParent = user?.role === 'parent';
       if (isParent) {
         await api.put('/users/me', { role: 'player' }).catch(() => {});
         bridgedRole = true;
+        setIsBridgedParent(true);
       }
 
-      // 2. Step 5.1: Create Payment Order
+      // 2. Step 5.1: Create Payment Order on backend
       const orderPayload: any = { slotId };
       if (childId && childId.length === 24) {
         orderPayload.childId = childId;
@@ -74,59 +84,193 @@ export default function PaymentScreen() {
       }
 
       const orderData = orderRes.data?.data || orderRes.data;
-      const orderId = orderData.orderId || orderData.id;
+      const orderId = orderData.orderId || orderData.id || `order_${Date.now()}`;
+      const amountPaise = orderData.amount || Math.round(computedTotal * 100);
+      const keyId = orderData.keyId || orderData.razorpayKeyId || RAZORPAY_KEY_ID;
 
-      // 3. Step 5.2: Verify Payment & Confirm Booking on live backend database
-      const verifyPayload: any = {
-        paymentOrderId: orderId,
-        paymentTransactionId: "mock_transaction_id",
-        paymentSignature: "mock_signature_hash",
-        slotId: slotId
-      };
-      if (childId && childId.length === 24) {
-        verifyPayload.childId = childId;
-      }
-
-      try {
-        await api.post('/bookings/verify-payment', verifyPayload);
-      } catch (verifyErr: any) {
-        delete verifyPayload.childId;
-        await api.post('/bookings/verify-payment', verifyPayload);
-      }
-
-      // 4. Restore parent role
-      if (bridgedRole) {
-        await api.put('/users/me', { role: 'parent' }).catch(() => {});
-      }
-
-      // 5. Invalidate all booking queries so coach and user see the confirmed session
-      queryClient.invalidateQueries({ queryKey: ['myBookings'] });
-      queryClient.invalidateQueries({ queryKey: ['playerBookings'] });
-      queryClient.invalidateQueries({ queryKey: ['parentBookings'] });
-      queryClient.invalidateQueries({ queryKey: ['coachSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['slots'] });
-
-      setIsProcessing(false);
-      router.push({
-        pathname: '/(shared)/booking-confirmed',
-        params: {
-          coachName: coachName || 'Coach',
-          studentName: studentName || 'Attendee',
-          sport: coachSport || 'Sports',
-          date: date || 'Scheduled Date',
-          time: time || 'Scheduled Time',
-          amount: computedTotal.toString(),
-          txnId: "mock_transaction_id"
-        }
+      setRazorpayOrder({
+        orderId,
+        amount: amountPaise,
+        keyId
       });
+      setIsRazorpayModalVisible(true);
+      setIsProcessing(false);
     } catch (err: any) {
       if (bridgedRole) {
         await api.put('/users/me', { role: 'parent' }).catch(() => {});
+        setIsBridgedParent(false);
       }
       setIsProcessing(false);
-      const serverMsg = err.response?.data?.message || err.message || 'Payment verification failed.';
-      Alert.alert('Payment Error', serverMsg);
+      const serverMsg = err.response?.data?.message || err.message || 'Could not initialize payment order.';
+      Alert.alert('Payment Order Error', serverMsg);
     }
+  };
+
+  const handleRazorpayMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.status === 'success') {
+        setIsRazorpayModalVisible(false);
+        setIsProcessing(true);
+
+        const verifyPayload: any = {
+          paymentOrderId: data.razorpay_order_id || razorpayOrder?.orderId,
+          paymentTransactionId: data.razorpay_payment_id,
+          paymentSignature: data.razorpay_signature,
+          slotId: slotId
+        };
+        if (childId && childId.length === 24) {
+          verifyPayload.childId = childId;
+        }
+
+        try {
+          await api.post('/bookings/verify-payment', verifyPayload);
+        } catch (verifyErr: any) {
+          delete verifyPayload.childId;
+          await api.post('/bookings/verify-payment', verifyPayload);
+        }
+
+        // Restore parent role if bridged
+        if (isBridgedParent) {
+          await api.put('/users/me', { role: 'parent' }).catch(() => {});
+          setIsBridgedParent(false);
+        }
+
+        // Invalidate all booking queries so coach and user see the confirmed session
+        queryClient.invalidateQueries({ queryKey: ['myBookings'] });
+        queryClient.invalidateQueries({ queryKey: ['playerBookings'] });
+        queryClient.invalidateQueries({ queryKey: ['parentBookings'] });
+        queryClient.invalidateQueries({ queryKey: ['coachSessions'] });
+        queryClient.invalidateQueries({ queryKey: ['slots'] });
+
+        setIsProcessing(false);
+        router.push({
+          pathname: '/(shared)/booking-confirmed',
+          params: {
+            coachName: coachName || 'Coach',
+            studentName: studentName || 'Attendee',
+            sport: coachSport || 'Sports',
+            date: date || 'Scheduled Date',
+            time: time || 'Scheduled Time',
+            amount: computedTotal.toString(),
+            txnId: data.razorpay_payment_id
+          }
+        });
+      } else if (data.status === 'cancelled') {
+        setIsRazorpayModalVisible(false);
+        if (isBridgedParent) {
+          await api.put('/users/me', { role: 'parent' }).catch(() => {});
+          setIsBridgedParent(false);
+        }
+        Alert.alert('Payment Cancelled', 'You cancelled the payment transaction.');
+      } else if (data.status === 'failed') {
+        setIsRazorpayModalVisible(false);
+        if (isBridgedParent) {
+          await api.put('/users/me', { role: 'parent' }).catch(() => {});
+          setIsBridgedParent(false);
+        }
+        const errorDesc = data.error?.description || 'Transaction failed.';
+        Alert.alert('Payment Failed', errorDesc);
+      }
+    } catch (err: any) {
+      setIsRazorpayModalVisible(false);
+      if (isBridgedParent) {
+        await api.put('/users/me', { role: 'parent' }).catch(() => {});
+        setIsBridgedParent(false);
+      }
+      Alert.alert('Payment Error', 'An error occurred during payment processing.');
+    }
+  };
+
+  const getRazorpayHtml = () => {
+    if (!razorpayOrder) return '';
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: #EEF3F9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          }
+          .loader-container {
+            text-align: center;
+            color: #0F2C59;
+            padding: 20px;
+          }
+          .spinner {
+            border: 4px solid rgba(15, 44, 89, 0.1);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border-left-color: #FF5100;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px auto;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+      </head>
+      <body>
+        <div class="loader-container">
+          <div class="spinner"></div>
+          <h3 style="margin: 0; font-size: 16px;">Opening Razorpay Checkout...</h3>
+        </div>
+        <script>
+          var options = {
+            "key": ${JSON.stringify(razorpayOrder.keyId)},
+            "amount": ${razorpayOrder.amount},
+            "currency": "INR",
+            "name": "Arenova Sports",
+            "description": "Coaching Session Booking",
+            "order_id": ${JSON.stringify(razorpayOrder.orderId)},
+            "handler": function (response){
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                status: 'success',
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature
+              }));
+            },
+            "modal": {
+              "ondismiss": function(){
+                window.ReactNativeWebView.postMessage(JSON.stringify({ status: 'cancelled' }));
+              }
+            },
+            "prefill": {
+              "name": ${JSON.stringify(user?.name || studentName || 'Customer')},
+              "email": ${JSON.stringify(user?.email || '')},
+              "contact": ${JSON.stringify(user?.phone || '')}
+            },
+            "theme": {
+              "color": "#FF5100"
+            }
+          };
+          var rzp1 = new Razorpay(options);
+          rzp1.on('payment.failed', function (response){
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              status: 'failed',
+              error: response.error
+            }));
+          });
+          window.onload = function() {
+            rzp1.open();
+          };
+        </script>
+      </body>
+      </html>
+    `;
   };
 
   return (
@@ -142,7 +286,7 @@ export default function PaymentScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6 pb-28">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }}>
         
         {/* Attendee Details Card */}
         <View className="bg-white rounded-2xl p-5 mb-5 shadow-sm border border-gray-50">
@@ -221,13 +365,69 @@ export default function PaymentScreen() {
       </ScrollView>
 
       {/* Sticky Bottom Pay Button */}
-      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: 32, zIndex: 20 }}>
+      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: Math.max(insets.bottom + 16, 32), zIndex: 20 }}>
         <Button 
           title={`Pay Now (₹${computedTotal})`}
           onPress={handlePayment}
           isLoading={isProcessing}
         />
       </View>
+
+      {/* Razorpay Gateway Checkout Modal */}
+      <Modal
+        visible={isRazorpayModalVisible}
+        animationType="slide"
+        onRequestClose={() => {
+          setIsRazorpayModalVisible(false);
+          if (isBridgedParent) {
+            api.put('/users/me', { role: 'parent' }).catch(() => {});
+            setIsBridgedParent(false);
+          }
+        }}
+      >
+        <SafeAreaView className="flex-1 bg-[#EEF3F9]">
+          <View className="px-4 py-3 bg-white border-b border-gray-100 flex-row justify-between items-center shadow-sm">
+            <View className="flex-row items-center">
+              <Ionicons name="shield-checkmark-outline" size={20} color="#FF5100" className="mr-2" />
+              <Typography variant="subtitle1" color="secondary" weight="bold" className="font-outfit-bold">
+                Razorpay Secure Checkout
+              </Typography>
+            </View>
+            <TouchableOpacity 
+              onPress={() => {
+                setIsRazorpayModalVisible(false);
+                if (isBridgedParent) {
+                  api.put('/users/me', { role: 'parent' }).catch(() => {});
+                  setIsBridgedParent(false);
+                }
+              }}
+              className="p-1"
+            >
+              <Ionicons name="close" size={24} color="#0F2C59" />
+            </TouchableOpacity>
+          </View>
+
+          {razorpayOrder && (
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: getRazorpayHtml() }}
+              onMessage={handleRazorpayMessage}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View className="absolute inset-0 justify-center items-center bg-[#EEF3F9]">
+                  <ActivityIndicator size="large" color="#FF5100" />
+                  <Typography variant="body2" color="secondary" className="mt-3 font-outfit-bold">
+                    Initializing Payment Gateway...
+                  </Typography>
+                </View>
+              )}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }

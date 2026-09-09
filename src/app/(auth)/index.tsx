@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Typography, Button } from '@/components/ui';
 
 export default function WelcomeScreen() {
+  const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]">
@@ -24,7 +25,7 @@ export default function WelcomeScreen() {
           </Typography>
         </View>
 
-        <View className="w-full pb-10">
+        <View className="w-full" style={{ paddingBottom: Math.max(insets.bottom + 16, 36) }}>
           <Button 
             title="Get Started" 
             variant="primary"

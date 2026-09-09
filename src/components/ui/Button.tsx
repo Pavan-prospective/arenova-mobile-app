@@ -28,7 +28,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const getContainerStyles = () => {
-    let base = 'flex-row items-center justify-center rounded-full overflow-hidden ';
+    let base = 'flex-row items-center justify-center rounded-full ';
     
     if (fullWidth) base += 'w-full ';
 
@@ -90,13 +90,13 @@ export const Button: React.FC<ButtonProps> = ({
       {isLoading ? (
         <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? '#FF5722' : '#FFFFFF'} size="small" />
       ) : (
-        <>
+        <View className="flex-row items-center justify-center px-2">
           {leftIcon && <View className="mr-2">{leftIcon}</View>}
           <Typography variant={getTextVariant()} color={getTextColor()} weight="semibold">
             {title}
           </Typography>
           {rightIcon && <View className="ml-2">{rightIcon}</View>}
-        </>
+        </View>
       )}
     </TouchableOpacity>
   );

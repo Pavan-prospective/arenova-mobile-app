@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -23,6 +23,7 @@ interface Slot {
 }
 
 export default function SelectDateScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
   const { coachId } = useLocalSearchParams<{ coachId?: string }>();
@@ -111,7 +112,7 @@ export default function SelectDateScreen() {
   const selectedSlot = slots.find(s => (s._id || s.id) === selectedSlotId);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       {/* Header */}
       <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-100 shadow-sm z-10">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
@@ -123,7 +124,7 @@ export default function SelectDateScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 60, 80) }}>
         
         {/* Coach Header Card */}
         {isLoadingCoach ? (

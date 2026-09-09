@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { View, ScrollView, Modal, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Typography, Card, Button, TextInput } from '@/components/ui';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { Calendar } from 'react-native-calendars';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -36,6 +35,7 @@ const parseTimeAndDateToDateObject = (dateStr: string, timeStr: string) => {
 };
 
 export default function ScheduleScreen() {
+  const insets = useSafeAreaInsets();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   
@@ -408,7 +408,7 @@ export default function ScheduleScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 110, 130) }}>
         <View className="flex-row justify-between items-center mb-6">
           <Typography variant="h2" color="secondary" className="font-outfit-bold">
             My Schedule
@@ -502,15 +502,14 @@ export default function ScheduleScreen() {
         onRequestClose={() => setIsModalVisible(false)}
       >
         <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           className="flex-1 justify-end bg-black/50"
         >
           <View className="bg-white rounded-t-3xl p-6 shadow-xl max-h-[85%]">
             <ScrollView 
               showsVerticalScrollIndicator={false} 
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 60 }}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 60, 80) }}
             >
               <View className="flex-row justify-between items-center mb-6">
                 <Typography variant="h2" color="secondary" className="font-outfit-bold">{editingSlotId ? 'Edit Slot' : 'Add New Slot'}</Typography>
@@ -638,53 +637,78 @@ export default function ScheduleScreen() {
                   </View>
                 </View>
 
-                <View className="flex-row gap-4 mb-6">
-                  <View className="flex-1">
-                    <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold">Start Time</Typography>
-                    <TouchableOpacity 
-                      onPress={() => setShowStartTimePicker(true)}
-                      activeOpacity={0.8}
-                      className="bg-white border-2 border-gray-200 rounded-full h-14 px-5 flex-row justify-between items-center"
-                    >
-                      <Typography color="secondary" className="font-outfit text-sm">{startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
-                      <Ionicons name="time-outline" size={20} color="#0F2C59" />
-                    </TouchableOpacity>
-                    {showStartTimePicker && (
-                      <DateTimePicker
-                        value={startTime}
-                        mode="time"
-                        display="default"
-                        onChange={(event, date) => {
-                          setShowStartTimePicker(false);
-                          if (date) setStartTime(date);
-                        }}
-                      />
-                    )}
-                  </View>
+                {/* Inline Start Time Pill Selector */}
+                <View className="mb-4">
+                  <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold uppercase tracking-wider text-gray-500">
+                    Start Time
+                  </Typography>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
+                    {['06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM'].map((tStr) => {
+                      const timeDate = (()=>{
+                        const [t, mod] = tStr.split(' ');
+                        let [h, m] = t.split(':').map(Number);
+                        if (mod === 'PM' && h < 12) h += 12;
+                        if (mod === 'AM' && h === 12) h = 0;
+                        const d = new Date();
+                        d.setHours(h, m, 0, 0);
+                        return d;
+                      })();
+                      const isSelected = startTime.getHours() === timeDate.getHours() && startTime.getMinutes() === timeDate.getMinutes();
 
-                  <View className="flex-1">
-                    <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold">End Time</Typography>
-                    <TouchableOpacity 
-                      onPress={() => setShowEndTimePicker(true)}
-                      activeOpacity={0.8}
-                      className="bg-white border-2 border-gray-200 rounded-full h-14 px-5 flex-row justify-between items-center"
-                    >
-                      <Typography color="secondary" className="font-outfit text-sm">{endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
-                      <Ionicons name="time-outline" size={20} color="#0F2C59" />
-                    </TouchableOpacity>
-                    {showEndTimePicker && (
-                      <DateTimePicker
-                        value={endTime}
-                        mode="time"
-                        display="default"
-                        onChange={(event, date) => {
-                          setShowEndTimePicker(false);
-                          if (date) setEndTime(date);
-                        }}
-                      />
-                    )}
-                  </View>
+                      return (
+                        <TouchableOpacity
+                          key={tStr}
+                          onPress={() => setStartTime(timeDate)}
+                          activeOpacity={0.8}
+                          className={`px-4 py-2.5 rounded-full border-2 mr-2 justify-center items-center ${
+                            isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-200'
+                          }`}
+                        >
+                          <Typography color={isSelected ? 'white' : 'secondary'} weight="bold" className="font-outfit-bold text-xs">
+                            {tStr}
+                          </Typography>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
                 </View>
+
+                {/* Inline End Time Pill Selector */}
+                <View className="mb-4">
+                  <Typography variant="caption" color="secondary" weight="bold" className="mb-2 ml-1 font-outfit-bold uppercase tracking-wider text-gray-500">
+                    End Time
+                  </Typography>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row py-1">
+                    {['07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '05:00 PM', '06:00 PM', '07:00 PM', '08:00 PM', '09:00 PM'].map((tStr) => {
+                      const timeDate = (()=>{
+                        const [t, mod] = tStr.split(' ');
+                        let [h, m] = t.split(':').map(Number);
+                        if (mod === 'PM' && h < 12) h += 12;
+                        if (mod === 'AM' && h === 12) h = 0;
+                        const d = new Date();
+                        d.setHours(h, m, 0, 0);
+                        return d;
+                      })();
+                      const isSelected = endTime.getHours() === timeDate.getHours() && endTime.getMinutes() === timeDate.getMinutes();
+
+                      return (
+                        <TouchableOpacity
+                          key={tStr}
+                          onPress={() => setEndTime(timeDate)}
+                          activeOpacity={0.8}
+                          className={`px-4 py-2.5 rounded-full border-2 mr-2 justify-center items-center ${
+                            isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-200'
+                          }`}
+                        >
+                          <Typography color={isSelected ? 'white' : 'secondary'} weight="bold" className="font-outfit-bold text-xs">
+                            {tStr}
+                          </Typography>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
                 {formErrors.times && (
                   <Typography variant="caption" color="error" className="mb-4 ml-1 font-outfit">
                     {formErrors.times}

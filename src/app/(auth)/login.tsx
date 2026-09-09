@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
@@ -11,6 +11,7 @@ import { auth } from '@/services/firebase';
 import { signInWithEmailAndPassword, getIdToken } from 'firebase/auth';
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const { role } = useLocalSearchParams<{ role: string }>();
   const [authMode, setAuthMode] = useState<'email' | 'phone'>('email');
   
@@ -217,9 +218,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
         <View className="px-6 py-4 z-10">
@@ -238,7 +239,7 @@ export default function LoginScreen() {
           className="flex-1 px-6 pt-4" 
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 60, 80) }}
         >
           
           <View className="mb-10 items-center">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -26,6 +26,7 @@ interface CoachProfile {
 }
 
 export default function PublicCoachProfileScreen() {
+  const insets = useSafeAreaInsets();
   console.log('[DEBUG coach-profile] 1. entering component');
   const router = useRouter();
   console.log('[DEBUG coach-profile] 2. after useRouter');
@@ -89,7 +90,7 @@ export default function PublicCoachProfileScreen() {
   const bio = coach.bio || "Professional coach with verified experience in training students of all ages. Let's improve your game!";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#EEF3F9' }}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', zIndex: 10 }}>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, marginLeft: -8 }}>
@@ -153,7 +154,7 @@ export default function PublicCoachProfileScreen() {
       </ScrollView>
 
       {/* Book Button */}
-      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: 32, zIndex: 20 }}>
+      <View style={{ position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#ffffff', padding: 16, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingBottom: Math.max(insets.bottom + 16, 32), zIndex: 20 }}>
         <Button 
           title="Book Session" 
           onPress={() => router.push({

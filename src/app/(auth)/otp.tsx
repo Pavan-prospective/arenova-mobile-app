@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Typography, Button, TextInput } from '@/components/ui';
 import { useAuthStore } from '@/store';
@@ -11,6 +11,7 @@ import { PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth } from '@/services/firebase';
 
 export default function OTPScreen() {
+  const insets = useSafeAreaInsets();
   const { role, action, name, phone, email, idProof, verificationId } = useLocalSearchParams<{ 
     role: string; 
     action: string; 
@@ -133,7 +134,11 @@ export default function OTPScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 24 }} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1, padding: 24, paddingBottom: Math.max(insets.bottom + 32, 48) }} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           
           <TouchableOpacity onPress={() => {
             if (router.canGoBack()) {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,7 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
 export default function ReviewPlayerScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { bookingId, coachName, dateDisplay, sport: initialSport } = useLocalSearchParams<{
     bookingId?: string;
@@ -60,7 +61,7 @@ export default function ReviewPlayerScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         {/* Header */}
         <View className="px-4 py-4 flex-row items-center bg-white border-b border-gray-100 shadow-sm z-10">
@@ -72,7 +73,7 @@ export default function ReviewPlayerScreen() {
           </Typography>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6 pb-24">
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" className="flex-1 px-4 pt-6" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }}>
           
           <View className="items-center mb-8">
             <View className="w-20 h-20 rounded-full bg-[#F5CEAA] items-center justify-center mb-3">

@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { useAuthStore } from '@/store';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
 export default function IndividualDashboard() {
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // Fetch recommended coaches
   const { data: coachesResponse, isLoading: isLoadingCoaches } = useQuery({
@@ -23,21 +35,27 @@ export default function IndividualDashboard() {
   const coaches = coachesResponse?.data || [];
   return (
     <View className="flex-1 bg-[#EEF3F9]">
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} scrollEventThrottle={16} decelerationRate="normal" className="flex-1" contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 40, 60) }}>
         
         {/* Header Section */}
         <View className="bg-secondary px-6 pt-16 pb-8 rounded-b-3xl shadow-sm">
           <View className="flex-row justify-between items-center mb-2">
-            <View>
-              <Typography variant="h2" color="white" weight="bold">
+            <View className="flex-1 mr-2">
+              <Typography variant="h2" color="white" weight="bold" className="font-outfit-bold">
                 Welcome back, {user?.name || 'User'}!
               </Typography>
-              <Typography variant="caption" color="light" className="opacity-80">
+              <Typography variant="caption" color="light" className="opacity-80 font-outfit">
                 Track your personal training progress & bookings.
               </Typography>
             </View>
-            
-
+            <View className="flex-row items-center">
+              <TouchableOpacity className="p-1 mr-3" onPress={() => router.push('/notifications')}>
+                <Ionicons name="notifications-outline" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity className="p-1" onPress={() => router.push('/settings')}>
+                <Ionicons name="settings-outline" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

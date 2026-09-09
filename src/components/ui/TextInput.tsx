@@ -42,6 +42,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           className={`flex-1 text-base text-text font-medium ${props.multiline ? '' : 'h-full'}`}
           placeholderTextColor="#9CA3AF"
           textAlignVertical={props.multiline ? 'top' : 'center'}
+          style={[{ includeFontPadding: false }, props.style]}
           onFocus={(e) => {
             setIsFocused(true);
             props.onFocus?.(e);

@@ -1,14 +1,27 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store';
 
 export default function CoachDashboard() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const [metricsModalVisible, setMetricsModalVisible] = React.useState(false);
   const [selectedMetricTab, setSelectedMetricTab] = React.useState<'earnings' | 'sessions' | 'rating'>('earnings');
@@ -310,7 +323,7 @@ export default function CoachDashboard() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 pt-2">
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} scrollEventThrottle={16} decelerationRate="normal" className="flex-1 pt-2" contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 40, 60) }}>
         {/* Current Sessions */}
         <View className="px-6 pb-6">
           <View className="flex-row justify-between items-center mb-4">
@@ -355,7 +368,7 @@ export default function CoachDashboard() {
                     </View>
                   </View>
 
-                  <View className="w-20">
+                  <View className="w-24">
                     <Button 
                       title="View" 
                       size="sm" 
@@ -434,7 +447,7 @@ export default function CoachDashboard() {
                     </View>
                   </View>
 
-                  <View className="w-20">
+                  <View className="w-24">
                     <Button 
                       title="View" 
                       size="sm" 
@@ -588,7 +601,8 @@ export default function CoachDashboard() {
           <View 
             onStartShouldSetResponder={() => true}
             onTouchEnd={(e) => e.stopPropagation()}
-            className="bg-white rounded-t-[32px] px-6 pt-4 pb-10 shadow-2xl border-t border-gray-200"
+            className="bg-white rounded-t-[32px] px-6 pt-4 shadow-2xl border-t border-gray-200"
+            style={{ paddingBottom: Math.max(insets.bottom + 24, 36) }}
           >
             {/* Drag Handle Indicator */}
             <View className="w-12 h-1 bg-gray-300 rounded-full self-center mb-6" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,7 @@ interface Transaction {
 }
 
 export default function WalletScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [withdrawTab, setWithdrawTab] = useState<'upi' | 'bank'>('upi');
@@ -194,7 +195,7 @@ export default function WalletScreen() {
   const isPageLoading = isSummaryLoading || isTransactionsLoading || isWithdrawalsLoading;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       {/* Header */}
       <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-100 shadow-sm z-10">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
@@ -216,7 +217,7 @@ export default function WalletScreen() {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
         {isPageLoading ? (
@@ -225,7 +226,7 @@ export default function WalletScreen() {
             <Typography variant="body2" color="muted" className="mt-2">Loading wallet details...</Typography>
           </View>
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6 pb-12">
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" className="flex-1 px-4 pt-6" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 60, 80) }}>
             {/* Balance Cards Summary */}
             <View className="bg-white rounded-3xl p-5 mb-6 shadow-sm border border-gray-100">
               <View className="bg-[#EBF7F0] border border-[#D5EFE0] p-5 rounded-2xl mb-4 flex-row justify-between items-center">

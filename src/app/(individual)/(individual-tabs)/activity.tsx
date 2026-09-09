@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { api } from '@/services/api';
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed'>('upcoming');
 
   // Fetch bookings list
@@ -40,8 +41,8 @@ export default function BookingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-      <View className="px-4 py-4 bg-white border-b border-gray-100 flex-row justify-between items-center shadow-sm z-10">
-        <Typography variant="h2" color="secondary" weight="bold" className="font-outfit-bold">
+      <View className="px-4 py-4 bg-[#0F2C59] border-b border-gray-100 flex-row justify-between items-center shadow-sm z-10">
+        <Typography variant="h2" color="white" weight="bold" className="font-outfit-bold">
           My Bookings
         </Typography>
         <TouchableOpacity onPress={() => refetch()} className="p-1">
@@ -95,7 +96,11 @@ export default function BookingsScreen() {
           )}
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4 pb-8">
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          className="flex-1"
+          contentContainerStyle={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: Math.max(insets.bottom + 110, 130) }}
+        >
           {displayBookings.map((booking: any) => {
             const coachName = booking.coach?.name || booking.coachName || 'Coach';
             const coachInitials = coachName.split(' ').map((n: string) => n[0]).join('');
@@ -121,10 +126,10 @@ export default function BookingsScreen() {
                   </View>
                   <View className={`px-2.5 py-1 rounded-md ${
                     booking.status === 'confirmed' || booking.status === 'accepted'
-                      ? 'bg-green-50' 
+                      ? 'bg-green-50 border border-green-100' 
                       : booking.status === 'completed' 
-                        ? 'bg-gray-100' 
-                        : 'bg-orange-50'
+                        ? 'bg-emerald-50 border border-emerald-100' 
+                        : 'bg-orange-50 border border-orange-100'
                   }`}>
                     <Typography 
                       variant="caption" 
@@ -132,7 +137,7 @@ export default function BookingsScreen() {
                         booking.status === 'confirmed' || booking.status === 'accepted'
                           ? 'text-green-700' 
                           : booking.status === 'completed' 
-                            ? 'text-gray-700' 
+                            ? 'text-emerald-700' 
                             : 'text-orange-700'
                       } font-outfit-bold text-[11px]`} 
                       weight="bold"
@@ -154,7 +159,7 @@ export default function BookingsScreen() {
                 </View>
 
                 <View className="flex-row justify-end mt-1">
-                  <View className="w-28">
+                  <View className="w-36">
                     <Button 
                       title="View Details" 
                       variant="outline" 

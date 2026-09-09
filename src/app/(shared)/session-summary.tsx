@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
 export default function SessionSummaryScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { 
     id, 
@@ -407,7 +408,7 @@ export default function SessionSummaryScreen() {
       </Modal>
 
       {/* Footer Buttons */}
-      <View className="p-4 bg-white border-t border-gray-100">
+      <View className="p-4 bg-white border-t border-gray-100" style={{ paddingBottom: Math.max(insets.bottom + 16, 28) }}>
         {isCoach ? (
           statusParam === 'requested' ? (
             <View className="flex-row justify-between">

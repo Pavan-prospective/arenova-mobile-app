@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Modal, Share, Clipboard, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useAuthStore } from '@/store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const router = useRouter();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
   const { user, logout, setUser } = useAuthStore();
 
   // Inline editing state
@@ -434,7 +446,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4 pb-8">
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" scrollEventThrottle={16} decelerationRate="normal" className="flex-1 px-4 pt-4" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 40, 60) }}>
           {user?.role === 'coach' && isProfileLoading ? (
             <ActivityIndicator size="large" color="#FF5100" style={{ marginTop: 40 }} />
           ) : (
@@ -690,15 +702,15 @@ export default function ProfileScreen() {
 
                     {/* KYC Proof */}
                     <View className="flex-row items-center py-2.5">
-                      <View className="w-8 h-8 rounded-full bg-gray-100 items-center justify-center mr-3">
-                        <Ionicons name="id-card" size={16} color="#4B5563" />
+                      <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-3">
+                        <Ionicons name="id-card" size={16} color="#3B82F6" />
                       </View>
                       <View className="flex-1">
                         <Typography variant="caption" color="muted" className="font-outfit">ID & Certification Proof</Typography>
                         {isEditing ? (
                           <TouchableOpacity 
                             onPress={handlePickImage}
-                            className="mt-2 bg-[#EEF3F9] p-3 rounded-xl flex-row justify-between items-center border border-gray-200"
+                            className="mt-2 bg-white p-3 rounded-xl flex-row justify-between items-center border border-gray-200 shadow-sm"
                           >
                             <Typography color="secondary" className="font-outfit text-xs">{idProof ? idProof : 'Upload Document'}</Typography>
                             <Ionicons name="cloud-upload-outline" size={18} color="#0F2C59" />
@@ -758,7 +770,7 @@ export default function ProfileScreen() {
           )}
 
           {/* Menu Action Sheet - Designed in a highly professional card tile list with spacing */}
-          <View className="mb-16">
+          <View className="mb-2">
             {menuItems.map((item) => {
               const details = getMenuDetails(item.id);
               return (

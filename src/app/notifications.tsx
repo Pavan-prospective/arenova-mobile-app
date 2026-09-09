@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -52,6 +52,7 @@ const formatRelativeTime = (dateString: string) => {
 };
 
 export default function NotificationsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -151,7 +152,7 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
       {/* Header */}
       <View className="px-4 py-4 flex-row items-center justify-between bg-white border-b border-gray-100 shadow-sm z-10">
         <View className="flex-row items-center">
@@ -287,7 +288,7 @@ export default function NotificationsScreen() {
               </TouchableOpacity>
             );
           }}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: Math.max(insets.bottom + 40, 60) }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl 

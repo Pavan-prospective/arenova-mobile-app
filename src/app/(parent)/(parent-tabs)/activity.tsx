@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 
 export default function BookingsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'completed'>('upcoming');
 
   // Fetch bookings list
@@ -95,7 +107,14 @@ export default function BookingsScreen() {
           )}
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4 pb-8">
+        <ScrollView 
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false} 
+          scrollEventThrottle={16}
+          decelerationRate="normal"
+          className="flex-1"
+          contentContainerStyle={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: Math.max(insets.bottom + 40, 60) }}
+        >
           {displayBookings.map((booking: any) => {
             const coachName = booking.coach?.name || booking.coachName || 'Coach';
             const childName = booking.child?.name || booking.childName || 'Myself';
@@ -128,10 +147,10 @@ export default function BookingsScreen() {
                   </View>
                   <View className={`px-2.5 py-1 rounded-md ${
                     booking.status === 'confirmed' || booking.status === 'accepted'
-                      ? 'bg-green-50' 
+                      ? 'bg-green-50 border border-green-100' 
                       : booking.status === 'completed' 
-                        ? 'bg-gray-100' 
-                        : 'bg-orange-50'
+                        ? 'bg-emerald-50 border border-emerald-100' 
+                        : 'bg-orange-50 border border-orange-100'
                   }`}>
                     <Typography 
                       variant="caption" 
@@ -139,7 +158,7 @@ export default function BookingsScreen() {
                         booking.status === 'confirmed' || booking.status === 'accepted'
                           ? 'text-green-700' 
                           : booking.status === 'completed' 
-                            ? 'text-gray-700' 
+                            ? 'text-emerald-700' 
                             : 'text-orange-700'
                       } font-outfit-bold text-[11px]`} 
                       weight="bold"
@@ -161,7 +180,7 @@ export default function BookingsScreen() {
                 </View>
 
                 <View className="flex-row justify-end mt-1">
-                  <View className="w-28">
+                  <View className="w-36">
                     <Button 
                       title="View Details" 
                       variant="outline" 

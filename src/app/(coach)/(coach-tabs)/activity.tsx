@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { api } from '@/services/api';
 
 export default function CoachActivityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'current' | 'upcoming' | 'completed'>('current');
 
   const { data: sessionsResponse, isLoading: isSessionsLoading } = useQuery({
@@ -125,12 +126,12 @@ export default function CoachActivityScreen() {
   const displayBookings = activeTab === 'current' ? currentBookings : activeTab === 'upcoming' ? coachBookings : coachCompleted;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
-      <View className="px-4 py-4 bg-white border-b border-gray-100 flex-row justify-between items-center">
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
+      <View className="px-4 py-4 bg-[#0F2C59] border-b border-gray-100 flex-row justify-between items-center">
         <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <Ionicons name="arrow-back" size={24} color="#0F2C59" />
+          <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
-        <Typography variant="h2" color="secondary" weight="bold">
+        <Typography variant="h2" color="white" weight="bold">
           My Activity
         </Typography>
         <View style={{ width: 40 }} />
@@ -165,7 +166,11 @@ export default function CoachActivityScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-4 pb-8">
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        className="flex-1"
+        contentContainerStyle={{ paddingLeft: 16, paddingRight: 16, paddingTop: 16, paddingBottom: Math.max(insets.bottom + 110, 130) }}
+      >
         
         {isSessionsLoading ? (
           <ActivityIndicator size="large" color="#FF5100" style={{ marginTop: 24 }} />
@@ -175,7 +180,7 @@ export default function CoachActivityScreen() {
           </View>
         ) : (
           displayBookings.map(booking => (
-          <View key={booking.id} className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 border border-gray-100">
+          <View key={booking.id} className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
             <View className="flex-row justify-between items-center mb-3 border-b border-gray-100 pb-3">
               <View className="flex-row items-center">
                 <View className="w-10 h-10 rounded-full bg-blue-100 mr-3 items-center justify-center">
@@ -191,18 +196,18 @@ export default function CoachActivityScreen() {
                 </View>
               </View>
               <View className={`px-2 py-1 rounded-md ${
-                booking.status === 'Ongoing' ? 'bg-red-100' : 
-                booking.status === 'Confirmed' || booking.status === 'Upcoming' ? 'bg-green-100' : 
-                booking.status === 'Completed' ? 'bg-gray-100' : 
-                booking.status === 'Delayed Warning' ? 'bg-amber-100' :
-                booking.status === 'Out of Time' || booking.status === 'Penalized' ? 'bg-red-100' : 'bg-orange-100'
+                booking.status === 'Ongoing' ? 'bg-red-100 border border-red-200' : 
+                booking.status === 'Confirmed' || booking.status === 'Upcoming' ? 'bg-green-100 border border-green-200' : 
+                booking.status === 'Completed' ? 'bg-emerald-50 border border-emerald-200' : 
+                booking.status === 'Delayed Warning' ? 'bg-amber-100 border border-amber-200' :
+                booking.status === 'Out of Time' || booking.status === 'Penalized' ? 'bg-red-100 border border-red-200' : 'bg-orange-100 border border-orange-200'
               }`}>
                 <Typography 
                   variant="caption" 
                   className={
                     booking.status === 'Ongoing' ? 'text-red-700' : 
                     booking.status === 'Confirmed' || booking.status === 'Upcoming' ? 'text-green-700' : 
-                    booking.status === 'Completed' ? 'text-gray-700' : 
+                    booking.status === 'Completed' ? 'text-emerald-700' : 
                     booking.status === 'Delayed Warning' ? 'text-amber-700' :
                     booking.status === 'Out of Time' || booking.status === 'Penalized' ? 'text-red-700' : 'text-orange-700'
                   } 
@@ -299,7 +304,7 @@ export default function CoachActivityScreen() {
             )}
 
             <View className="flex-row justify-end mt-1">
-              <View className="w-28">
+              <View className="w-36">
                 <Button 
                   title="View Details" 
                   size="sm"

@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '@/components/ui';
 import { router } from 'expo-router';
 
 export default function SelectSportScreen() {
+  const insets = useSafeAreaInsets();
   const sports = [
     { 
       id: '1', 
@@ -54,7 +55,7 @@ export default function SelectSportScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6 pb-12">
+      <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-4 pt-6" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 40, 60) }}>
         <View className="flex-row flex-wrap justify-between pb-8">
           {sports.map((sport) => (
             <TouchableOpacity 

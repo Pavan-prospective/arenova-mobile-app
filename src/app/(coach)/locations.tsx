@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
 import { useRouter } from 'expo-router';
@@ -187,6 +187,7 @@ const getMapHtml = (lat: number, lng: number) => {
 };
 
 export default function LocationsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { selectedLocationId, setSelectedLocationId } = useAuthStore();
@@ -522,7 +523,7 @@ export default function LocationsScreen() {
 
         {/* Floating Sticky Add Button */}
         {locations.length > 0 && (
-          <View className="absolute bottom-6 left-4 right-4 z-10 shadow-md">
+          <View className="absolute left-4 right-4 z-10 shadow-md" style={{ bottom: Math.max(insets.bottom + 16, 24) }}>
             <Button 
               title="Add New Location" 
               onPress={openAddScreen} 
@@ -536,7 +537,7 @@ export default function LocationsScreen() {
 
   // RENDERING MODE: ADD/EDIT FORM SCREEN
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-white">
       {/* Form Header */}
       <View className="px-4 py-4 flex-row items-center justify-between border-b border-gray-100 shadow-sm z-10 bg-white">
         <View className="flex-row items-center">
@@ -556,14 +557,14 @@ export default function LocationsScreen() {
       </View>
 
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1 bg-white"
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView 
           showsVerticalScrollIndicator={false} 
+          keyboardShouldPersistTaps="handled"
           className="flex-1 px-5 pt-6"
-          contentContainerStyle={{ paddingBottom: 60 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }}
         >
           {submitError && (
             <View className="mb-5 bg-red-50 border border-red-200 rounded-2xl p-4 flex-row items-start shadow-sm animate-fade-in">
@@ -705,7 +706,7 @@ export default function LocationsScreen() {
             )}
 
             {/* Bottom Premium Card Overlay */}
-            <View className="absolute bottom-6 left-4 right-4 bg-white rounded-2xl p-4 shadow-lg border border-gray-100 z-20">
+            <View className="absolute left-4 right-4 bg-white rounded-2xl p-4 shadow-lg border border-gray-100 z-20" style={{ bottom: Math.max(insets.bottom + 16, 24) }}>
               <View className="flex-row items-start mb-4">
                 <Ionicons name="location-sharp" size={20} color="#FF5100" className="mr-2 mt-0.5" />
                 <View className="flex-1">

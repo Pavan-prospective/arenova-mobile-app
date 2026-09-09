@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { View, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button } from '@/components/ui';
 
 export default function RoleSelectionScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedRole, setSelectedRole] = useState<'individual' | 'parent' | 'coach' | null>(null);
 
   const roles = [
@@ -81,7 +82,7 @@ export default function RoleSelectionScreen() {
           })}
         </View>
 
-        <View className="flex-1 justify-end pb-12">
+        <View className="flex-1 justify-end" style={{ paddingBottom: Math.max(insets.bottom + 20, 40) }}>
           <Button 
             title="Register" 
             disabled={!selectedRole}

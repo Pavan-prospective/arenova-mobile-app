@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 export default function CoachRegistrationScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { fromLogin } = useLocalSearchParams<{ fromLogin?: string }>();
   const setUser = useAuthStore(state => state.setUser);
   const user = useAuthStore(state => state.user);
@@ -199,8 +200,8 @@ export default function CoachRegistrationScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}>
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <View className="px-4 py-4 flex-row justify-between items-center bg-white border-b border-gray-200 shadow-sm z-10">
           <TouchableOpacity 
             onPress={() => {
@@ -215,7 +216,7 @@ export default function CoachRegistrationScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingBottom: Platform.OS === 'ios' ? 140 : 80 }}>
+        <ScrollView className="flex-1" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }}>
           <View className="px-6 pt-6 pb-12">
             <Typography variant="h2" color="secondary" weight="bold" className="mb-6">
               Professional Details

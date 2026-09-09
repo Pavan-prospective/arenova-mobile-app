@@ -73,6 +73,7 @@ export const Typography: React.FC<TypographyProps> = ({
   return (
     <Text
       className={`${variantClass} ${colorClass} ${weightClass} ${alignClass} ${className}`}
+      style={[{ includeFontPadding: false, paddingRight: 4 }, props.style]}
       {...props}
     >
       {children}

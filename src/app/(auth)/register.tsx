@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Button, TextInput } from '@/components/ui';
@@ -44,6 +44,7 @@ const validatePassword = (pass: string): string | null => {
 };
 
 export default function RegisterScreen() {
+  const insets = useSafeAreaInsets();
   const { role } = useLocalSearchParams<{ role: string }>();
   
   const setToken = useAuthStore(state => state.setToken);
@@ -377,6 +378,7 @@ export default function RegisterScreen() {
 
     setScreenError(null);
     setScreenSuccess(null);
+
     if (role === 'coach') {
       step1Mutation.mutate();
     } else {
@@ -385,8 +387,8 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#EEF3F9]" edges={['top']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+    <SafeAreaView className="flex-1 bg-[#EEF3F9]">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
 
         <View className="px-6 py-4 z-10">
           <TouchableOpacity onPress={() => {
@@ -406,7 +408,7 @@ export default function RegisterScreen() {
           className="flex-1 px-6 pt-4" 
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 60 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 80, 100) }}
         >
           
           {screenError && (
