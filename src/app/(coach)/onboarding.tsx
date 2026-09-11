@@ -20,6 +20,8 @@ export default function CoachRegistrationScreen() {
   
   const [location, setLocation] = useState('');
   const [experience, setExperience] = useState('');
+  const [requestedIndividualPrice, setRequestedIndividualPrice] = useState('');
+  const [requestedGroupPricePerPerson, setRequestedGroupPricePerPerson] = useState('');
   const [achievements, setAchievements] = useState<string[]>(['']);
   const [idProofs, setIdProofs] = useState<string[]>([]);
   const [certificates, setCertificates] = useState<string[]>([]);
@@ -100,6 +102,8 @@ export default function CoachRegistrationScreen() {
         bio: description,
         address: { city: location },
         achievements: achievements.join('\n'),
+        requestedIndividualPrice: parseFloat(requestedIndividualPrice) || 0,
+        requestedGroupPricePerPerson: parseFloat(requestedGroupPricePerPerson) || 0,
       };
       const response = await api.put('/coach-app/onboarding', payload);
       return response.data;
@@ -116,6 +120,10 @@ export default function CoachRegistrationScreen() {
     const token = useAuthStore.getState().token;
     if (!token) {
       alert('Error: You are not logged in.');
+      return;
+    }
+    if (!requestedIndividualPrice || !requestedGroupPricePerPerson) {
+      alert('Please specify your requested individual and group session prices.');
       return;
     }
     onboardingMutation.mutate();
@@ -227,6 +235,32 @@ export default function CoachRegistrationScreen() {
               <TextInput placeholder="Experience (e.g. 5 Years)" value={experience} onChangeText={setExperience} />
               
               <View className="mt-2">
+                <Typography variant="caption" color="secondary" weight="semibold" className="mb-1 ml-1">
+                  Requested Pricing (Subject to Admin Approval) *
+                </Typography>
+                <View className="flex-row gap-3 mb-2">
+                  <View className="flex-1">
+                    <TextInput 
+                      placeholder="Individual Fee (₹)" 
+                      value={requestedIndividualPrice} 
+                      onChangeText={setRequestedIndividualPrice} 
+                      keyboardType="numeric"
+                      className="mb-0"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <TextInput 
+                      placeholder="Group Fee / Person (₹)" 
+                      value={requestedGroupPricePerPerson} 
+                      onChangeText={setRequestedGroupPricePerPerson} 
+                      keyboardType="numeric"
+                      className="mb-0"
+                    />
+                  </View>
+                </View>
+              </View>
+              
+              <View className="mt-2">
                 <View className="flex-row justify-between items-center px-1 mb-1">
                   <Typography variant="caption" color="secondary" weight="semibold">About Me</Typography>
                   <Typography variant="caption" color={descriptionWordCount >= 150 ? 'error' : 'muted'} className="text-[10px]">
@@ -323,7 +357,7 @@ export default function CoachRegistrationScreen() {
                 title="Submit Registration" 
                 onPress={handleSubmit} 
                 isLoading={onboardingMutation.isPending} 
-                disabled={!location || !experience || onboardingMutation.isPending}
+                disabled={!location || !experience || !requestedIndividualPrice || !requestedGroupPricePerPerson || onboardingMutation.isPending}
               />
             </View>
           </View>
