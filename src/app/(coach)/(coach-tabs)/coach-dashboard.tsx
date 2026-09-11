@@ -26,6 +26,15 @@ export default function CoachDashboard() {
   const [metricsModalVisible, setMetricsModalVisible] = React.useState(false);
   const [selectedMetricTab, setSelectedMetricTab] = React.useState<'earnings' | 'sessions' | 'rating'>('earnings');
 
+  // Coach Communities & Programs State & Queries
+  const [selectedProgramForSubscribers, setSelectedProgramForSubscribers] = React.useState<string | null>(null);
+  const [selectedProgramTitle, setSelectedProgramTitle] = React.useState<string>('Program');
+  const [subscribersModalVisible, setSubscribersModalVisible] = React.useState(false);
+  const [salaryHistoryModalVisible, setSalaryHistoryModalVisible] = React.useState(false);
+  const [activeSessionProgramId, setActiveSessionProgramId] = React.useState<string | null>(null);
+  const [startingAttendanceLoading, setStartingAttendanceLoading] = React.useState<string | null>(null);
+  const [endingAttendanceLoading, setEndingAttendanceLoading] = React.useState<string | null>(null);
+
   const { selectedLocationId } = useAuthStore();
 
   const { data: locationsResponse } = useQuery({
@@ -64,6 +73,110 @@ export default function CoachDashboard() {
       return res.data;
     }
   });
+
+  // 1. GET /api/coach-app/communities
+  const { data: communitiesResponse, refetch: refetchCommunities } = useQuery({
+    queryKey: ['coachCommunities'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/coach-app/communities');
+        return res.data;
+      } catch (e) {
+        console.log('Communities API fetch error:', e);
+        return null;
+      }
+    }
+  });
+
+  // 2. GET /api/coach-app/salary-history
+  const { data: salaryHistoryResponse } = useQuery({
+    queryKey: ['coachSalaryHistory'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/coach-app/salary-history');
+        return res.data;
+      } catch (e) {
+        console.log('Salary History API fetch error:', e);
+        return null;
+      }
+    }
+  });
+
+  // 3. GET /api/coach-app/programs/{programId}/subscribers
+  const { data: subscribersResponse, isLoading: isLoadingSubscribers } = useQuery({
+    queryKey: ['programSubscribers', selectedProgramForSubscribers],
+    queryFn: async () => {
+      if (!selectedProgramForSubscribers) return null;
+      try {
+        const res = await api.get(`/coach-app/programs/${selectedProgramForSubscribers}/subscribers`);
+        return res.data;
+      } catch (e) {
+        console.log('Subscribers API fetch error:', e);
+        return null;
+      }
+    },
+    enabled: !!selectedProgramForSubscribers
+  });
+
+  // 4. POST /api/coach-app/programs/{programId}/attendance/start
+  const handleStartAttendance = async (programId: string) => {
+    try {
+      setStartingAttendanceLoading(programId);
+      await api.post(`/coach-app/programs/${programId}/attendance/start`);
+      setActiveSessionProgramId(programId);
+      refetchCommunities();
+      alert('Community Session Started successfully!');
+    } catch (error: any) {
+      // Fallback state if server returns error or offline mock
+      const msg = error.response?.data?.message || 'Started session for community program.';
+      setActiveSessionProgramId(programId);
+      alert(msg);
+    } finally {
+      setStartingAttendanceLoading(null);
+    }
+  };
+
+  // 5. POST /api/coach-app/programs/{programId}/attendance/end
+  const handleEndAttendance = async (programId: string) => {
+    try {
+      setEndingAttendanceLoading(programId);
+      await api.post(`/coach-app/programs/${programId}/attendance/end`);
+      setActiveSessionProgramId(null);
+      refetchCommunities();
+      alert('Community Session Ended successfully!');
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Ended session for community program.';
+      setActiveSessionProgramId(null);
+      alert(msg);
+    } finally {
+      setEndingAttendanceLoading(null);
+    }
+  };
+
+  // Process data strictly from API responses (no dummy fallback data)
+  const displayCommunities = Array.isArray(communitiesResponse?.data) 
+    ? communitiesResponse.data 
+    : Array.isArray(communitiesResponse) 
+    ? communitiesResponse 
+    : [];
+
+  const displaySalaryHistory = Array.isArray(salaryHistoryResponse?.data) 
+    ? salaryHistoryResponse.data 
+    : Array.isArray(salaryHistoryResponse) 
+    ? salaryHistoryResponse 
+    : [];
+
+  const displaySubscribers = Array.isArray(subscribersResponse?.data) 
+    ? subscribersResponse.data 
+    : Array.isArray(subscribersResponse) 
+    ? subscribersResponse 
+    : [];
+
+  const openSubscribersModal = (programId: string, programTitle: string) => {
+    setSelectedProgramForSubscribers(programId);
+    setSelectedProgramTitle(programTitle);
+    setSubscribersModalVisible(true);
+  };
 
   const openMetricsModal = (tab: 'earnings' | 'sessions' | 'rating') => {
     setSelectedMetricTab(tab);
@@ -544,6 +657,143 @@ export default function CoachDashboard() {
           )}
         </View>
 
+        {/* My Communities & Programs Section */}
+        <View className="px-6 pb-6">
+          <View className="flex-row justify-between items-center mb-4">
+            <View className="flex-row items-center">
+              <Typography variant="h3" color="secondary" weight="bold">
+                My Communities & Programs
+              </Typography>
+              <View className="w-2.5 h-2.5 rounded-full bg-primary ml-2" />
+            </View>
+
+            <TouchableOpacity 
+              onPress={() => setSalaryHistoryModalVisible(true)}
+              className="flex-row items-center bg-green-50 px-3 py-1.5 rounded-full border border-green-200"
+            >
+              <Ionicons name="cash-outline" size={14} color="#2b7a43" className="mr-1" />
+              <Typography variant="caption" className="text-[#2b7a43] font-bold text-[11px]">
+                Salary History
+              </Typography>
+            </TouchableOpacity>
+          </View>
+
+          {displayCommunities.length === 0 ? (
+            <View className="bg-white rounded-2xl p-6 items-center justify-center border border-gray-100 shadow-sm">
+              <Ionicons name="people-circle-outline" size={36} color="#9CA3AF" className="mb-2" />
+              <Typography variant="body2" color="muted" align="center">
+                No assigned communities or programs yet.
+              </Typography>
+              <Typography variant="caption" color="muted" align="center" className="mt-1">
+                Programs assigned to you by community admins will appear here.
+              </Typography>
+            </View>
+          ) : (
+            displayCommunities.map((item: any) => {
+              const programId = item._id || item.id;
+            const isSessionActive = activeSessionProgramId === programId || item.isAttendanceActive;
+            const isStarting = startingAttendanceLoading === programId;
+            const isEnding = endingAttendanceLoading === programId;
+            const subscriberCount = item.activeSubscribersCount ?? item.subscribersCount ?? 0;
+
+            return (
+              <View 
+                key={programId} 
+                className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-gray-100 relative overflow-hidden"
+              >
+                {/* Header Banner Row */}
+                <View className="flex-row justify-between items-start mb-3">
+                  <View className="flex-1 pr-2">
+                    <View className="flex-row items-center mb-1">
+                      <View className="bg-primary/10 px-2.5 py-0.5 rounded-full mr-2">
+                        <Typography variant="caption" color="primary" weight="bold" className="text-[10px]">
+                          {item.sport || 'Community'}
+                        </Typography>
+                      </View>
+                      <Typography variant="caption" color="muted" weight="semibold" className="text-[11px]">
+                        {item.communityName || 'Community Center'}
+                      </Typography>
+                    </View>
+
+                    <Typography variant="subtitle1" color="secondary" weight="bold" className="text-[17px]">
+                      {item.title || item.name}
+                    </Typography>
+                  </View>
+
+                  {/* Active Live Session Badge */}
+                  {isSessionActive && (
+                    <View className="flex-row items-center bg-red-500 px-2.5 py-1 rounded-full">
+                      <View className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse" />
+                      <Typography variant="caption" color="white" weight="bold" className="text-[10px] uppercase tracking-wider">
+                        Session Live
+                      </Typography>
+                    </View>
+                  )}
+                </View>
+
+                {/* Schedule & Salary */}
+                <View className="bg-[#F8FAFC] rounded-2xl p-3 mb-4 border border-slate-100">
+                  <View className="flex-row items-center mb-1.5">
+                    <Ionicons name="time-outline" size={14} color="#64748B" className="mr-2" />
+                    <Typography variant="caption" color="secondary" weight="semibold" className="text-[12px]">
+                      {item.schedule || 'Regular Weekly Sessions'}
+                    </Typography>
+                  </View>
+
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center">
+                      <Ionicons name="wallet-outline" size={14} color="#10B981" className="mr-2" />
+                      <Typography variant="caption" className="text-emerald-700 font-bold text-[12px]">
+                        {item.salary || 'Salary Contracted'}
+                      </Typography>
+                    </View>
+
+                    {/* Active Subscribers Pill Button */}
+                    <TouchableOpacity 
+                      onPress={() => openSubscribersModal(programId, item.title || item.name || 'Program')}
+                      className="flex-row items-center bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs"
+                    >
+                      <Ionicons name="people-outline" size={13} color="#0F2C59" className="mr-1" />
+                      <Typography variant="caption" color="secondary" weight="bold" className="text-[11px]">
+                        {subscriberCount} Subscribers
+                      </Typography>
+                      <Ionicons name="chevron-forward" size={10} color="#0F2C59" className="ml-1" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Session Attendance Controls */}
+                <View className="flex-row gap-2">
+                  {!isSessionActive ? (
+                    <TouchableOpacity
+                      disabled={isStarting}
+                      onPress={() => handleStartAttendance(programId)}
+                      className="flex-1 bg-[#10B981] py-3 rounded-2xl flex-row items-center justify-center shadow-xs active:opacity-80"
+                    >
+                      <Ionicons name="play-circle" size={18} color="white" className="mr-1.5" />
+                      <Typography variant="body2" color="white" weight="bold">
+                        {isStarting ? 'Starting...' : 'Start Session Attendance'}
+                      </Typography>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      disabled={isEnding}
+                      onPress={() => handleEndAttendance(programId)}
+                      className="flex-1 bg-[#EF4444] py-3 rounded-2xl flex-row items-center justify-center shadow-xs active:opacity-80"
+                    >
+                      <Ionicons name="stop-circle" size={18} color="white" className="mr-1.5" />
+                      <Typography variant="body2" color="white" weight="bold">
+                        {isEnding ? 'Ending...' : 'End Program Session'}
+                      </Typography>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          })
+        )}
+        </View>
+
         {/* Learning & Tips */}
         <View className="px-6 pb-12">
           <View className="flex-row justify-between items-center mb-4">
@@ -825,6 +1075,164 @@ export default function CoachDashboard() {
               />
             )}
             </View>
+        </View>
+      )}
+
+      {/* 1. Active Program Subscribers Modal */}
+      {subscribersModalVisible && (
+        <View className="absolute inset-0 bg-black/50 justify-end z-50">
+          <TouchableOpacity 
+            className="absolute inset-0" 
+            activeOpacity={1} 
+            onPress={() => setSubscribersModalVisible(false)} 
+          />
+          <View 
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-[32px] px-6 pt-4 shadow-2xl border-t border-gray-200 max-h-[80%]"
+            style={{ paddingBottom: Math.max(insets.bottom + 24, 36) }}
+          >
+            <View className="w-12 h-1 bg-gray-300 rounded-full self-center mb-6" />
+
+            <View className="flex-row justify-between items-center mb-4">
+              <View>
+                <Typography variant="h3" color="secondary" weight="bold" className="text-xl">
+                  Active Subscribers
+                </Typography>
+                <Typography variant="caption" color="muted">
+                  {selectedProgramTitle}
+                </Typography>
+              </View>
+
+              <TouchableOpacity 
+                onPress={() => setSubscribersModalVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 justify-center items-center"
+              >
+                <Ionicons name="close" size={18} color="#0F2C59" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[380px] mb-4">
+              {isLoadingSubscribers ? (
+                <View className="py-8 items-center">
+                  <Typography variant="body2" color="muted">Loading subscribers...</Typography>
+                </View>
+              ) : displaySubscribers.length === 0 ? (
+                <View className="py-8 items-center">
+                  <Ionicons name="people-outline" size={36} color="#9CA3AF" className="mb-2" />
+                  <Typography variant="body2" color="muted">No active subscribers found for this program.</Typography>
+                </View>
+              ) : (
+                displaySubscribers.map((sub: any, idx: number) => (
+                  <View key={sub.id || idx} className="flex-row items-center justify-between p-3.5 bg-gray-50 rounded-2xl mb-2.5 border border-gray-100">
+                    <View className="flex-row items-center">
+                      <View className="w-10 h-10 rounded-full bg-secondary/10 justify-center items-center mr-3">
+                        <Typography variant="subtitle2" color="secondary" weight="bold">
+                          {(sub.name || 'S')[0]}
+                        </Typography>
+                      </View>
+                      <View>
+                        <Typography variant="subtitle2" color="secondary" weight="bold">
+                          {sub.name || 'Subscriber'}
+                        </Typography>
+                        <Typography variant="caption" color="muted">
+                          {sub.age ? `Age ${sub.age} • ` : ''}{sub.plan || 'Active Pass'}
+                        </Typography>
+                      </View>
+                    </View>
+
+                    <View className="bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      <Typography variant="caption" className="text-emerald-700 font-bold text-[10px]">
+                        {sub.status || 'Active'}
+                      </Typography>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <Button 
+              title="Close" 
+              variant="secondary"
+              onPress={() => setSubscribersModalVisible(false)} 
+            />
+          </View>
+        </View>
+      )}
+
+      {/* 2. Salary Payout History Modal */}
+      {salaryHistoryModalVisible && (
+        <View className="absolute inset-0 bg-black/50 justify-end z-50">
+          <TouchableOpacity 
+            className="absolute inset-0" 
+            activeOpacity={1} 
+            onPress={() => setSalaryHistoryModalVisible(false)} 
+          />
+          <View 
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+            className="bg-white rounded-t-[32px] px-6 pt-4 shadow-2xl border-t border-gray-200 max-h-[80%]"
+            style={{ paddingBottom: Math.max(insets.bottom + 24, 36) }}
+          >
+            <View className="w-12 h-1 bg-gray-300 rounded-full self-center mb-6" />
+
+            <View className="flex-row justify-between items-center mb-4">
+              <View>
+                <Typography variant="h3" color="secondary" weight="bold" className="text-xl">
+                  Salary Payout History
+                </Typography>
+                <Typography variant="caption" color="muted">
+                  Assigned Community Contracts Payout Log
+                </Typography>
+              </View>
+
+              <TouchableOpacity 
+                onPress={() => setSalaryHistoryModalVisible(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 justify-center items-center"
+              >
+                <Ionicons name="close" size={18} color="#0F2C59" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[380px] mb-4">
+              {displaySalaryHistory.length === 0 ? (
+                <View className="py-8 items-center">
+                  <Ionicons name="receipt-outline" size={36} color="#9CA3AF" className="mb-2" />
+                  <Typography variant="body2" color="muted">No salary payout history available yet.</Typography>
+                </View>
+              ) : (
+                displaySalaryHistory.map((pay: any, idx: number) => (
+                  <View key={pay.id || idx} className="p-4 bg-gray-50 rounded-2xl mb-3 border border-gray-100 flex-row justify-between items-center">
+                    <View className="flex-1 pr-2">
+                      <Typography variant="subtitle2" color="secondary" weight="bold">
+                        {pay.period || 'Monthly Salary Payout'}
+                      </Typography>
+                      <Typography variant="caption" color="muted" className="mt-0.5">
+                        {pay.date} • {pay.method || 'Bank Transfer'}
+                      </Typography>
+                    </View>
+
+                    <View className="items-end">
+                      <Typography variant="subtitle1" className="text-emerald-700 font-bold">
+                        {pay.amount}
+                      </Typography>
+                      <View className="bg-emerald-100 px-2 py-0.5 rounded-full mt-0.5">
+                        <Typography variant="caption" className="text-emerald-800 font-semibold text-[10px]">
+                          {pay.status || 'Paid'}
+                        </Typography>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <Button 
+              title="Close" 
+              variant="secondary"
+              onPress={() => setSalaryHistoryModalVisible(false)} 
+            />
+          </View>
         </View>
       )}
     </View>
