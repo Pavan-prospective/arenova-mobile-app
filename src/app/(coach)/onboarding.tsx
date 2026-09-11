@@ -236,7 +236,7 @@ export default function CoachRegistrationScreen() {
               
               <View className="mt-2">
                 <Typography variant="caption" color="secondary" weight="semibold" className="mb-1 ml-1">
-                  Requested Pricing (Subject to Admin Approval) *
+                  Requested Pricing *
                 </Typography>
                 <View className="flex-row gap-3 mb-2">
                   <View className="flex-1">
